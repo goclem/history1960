@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="062ec7d8-81fe-4e09-aba7-890d05adce3e" name="Default Changelist" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FavoritesManager">
+    <favorites_list name="code_1950" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectId" id="1aA9GFBfVlxmQKLAGAXO4ctvDT5" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="run.code.analysis.last.selected.profile" value="aDefault" />
+    <property name="settings.editor.selected.configurable" value="preferences.keymap" />
+  </component>
+  <component name="RunManager">
+    <configuration name="histo1950_data" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="code_1950" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/histo1950_data.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.histo1950_data" />
+        <item itemvalue="Python.histo1950_data" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="062ec7d8-81fe-4e09-aba7-890d05adce3e" name="Default Changelist" comment="" />
+      <created>1586167434592</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1586167434592</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="839" y="384" key="#com.intellij.openapi.keymap.impl.ui.EditKeymapsDialog" timestamp="1586176586507">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state x="839" y="384" key="#com.intellij.openapi.keymap.impl.ui.EditKeymapsDialog/0.0.2560.1440@0.0.2560.1440" timestamp="1586176586507" />
+    <state x="1037" y="598" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1" timestamp="1586173006656">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state x="1037" y="598" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.2560.1440@0.0.2560.1440" timestamp="1586173006656" />
+    <state width="2560" height="430" key="GridCell.Tab.0.bottom" timestamp="1586173407108">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state width="2560" height="430" key="GridCell.Tab.0.bottom/0.0.2560.1440@0.0.2560.1440" timestamp="1586173407108" />
+    <state width="2560" height="430" key="GridCell.Tab.0.center" timestamp="1586173407107">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state width="2560" height="430" key="GridCell.Tab.0.center/0.0.2560.1440@0.0.2560.1440" timestamp="1586173407107" />
+    <state width="2560" height="430" key="GridCell.Tab.0.left" timestamp="1586173407107">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state width="2560" height="430" key="GridCell.Tab.0.left/0.0.2560.1440@0.0.2560.1440" timestamp="1586173407107" />
+    <state width="2560" height="430" key="GridCell.Tab.0.right" timestamp="1586173407108">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state width="2560" height="430" key="GridCell.Tab.0.right/0.0.2560.1440@0.0.2560.1440" timestamp="1586173407108" />
+    <state x="781" y="359" key="SettingsEditor" timestamp="1586182979060">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state x="781" y="359" key="SettingsEditor/0.0.2560.1440@0.0.2560.1440" timestamp="1586182979060" />
+    <state x="1010" y="470" width="540" height="524" key="StructurePopup" timestamp="1586173126508">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state x="1010" y="470" width="540" height="524" key="StructurePopup/0.0.2560.1440@0.0.2560.1440" timestamp="1586173126508" />
+    <state x="957" y="552" key="com.intellij.ide.util.TipDialog" timestamp="1586167482043">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state x="957" y="552" key="com.intellij.ide.util.TipDialog/0.0.2560.1440@0.0.2560.1440" timestamp="1586167482043" />
+    <state x="929" y="454" width="700" height="530" key="recent.locations.popup" timestamp="1586173467519">
+      <screen x="0" y="0" width="2560" height="1440" />
+    </state>
+    <state x="929" y="454" width="700" height="530" key="recent.locations.popup/0.0.2560.1440@0.0.2560.1440" timestamp="1586173467519" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/histo1950_functions.py</url>
+          <line>42</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>
