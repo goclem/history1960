@@ -4,7 +4,7 @@
 @description: UNet models for arthisto1950
 @author: Clement Gorin
 @contact: gorin@gate.cnrs.fr
-@date: April 2020
+@date: March 2021
 """
 
 """
