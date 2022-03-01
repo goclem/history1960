@@ -24,6 +24,7 @@ from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 # Parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--seed", type=int,  default=1,    help="Session seed")
+
 parser.add_argument("--gpu",  type=bool, default=True, help="Uses GPU")
 params = parser.parse_args()
 
