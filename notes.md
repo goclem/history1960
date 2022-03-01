@@ -19,6 +19,9 @@ Semantic segmentation performs two tasks, which are learned simultaneously durin
 **Normalisation**: Any regularised model is sensitive to scale so the input needs to be normalised between 0 and 1.
 
 
+## Class imbalances
+
+In remote sensing, class im- balance represents often a problem for tasks like land cover mapping, as small objects get less prioritised in an effort to achieve the best overall accuracy.
 
 ## Modelling
 
