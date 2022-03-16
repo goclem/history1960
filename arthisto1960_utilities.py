@@ -16,7 +16,7 @@ import re
 import shutil
 
 from matplotlib import pyplot
-from osgeo import gdal, ogr
+from osgeo import gdal, ogr, osr
 
 #%% FUNCTIONS
 
@@ -29,6 +29,12 @@ def search_files(directory:str, pattern:str='.') -> list:
     files = list(filter(re.compile(pattern).search, files))
     files.sort()
     return files
+
+# Extracts file identifiers
+def identifiers(files:list) -> list:
+    identifiers = [os.path.splitext(os.path.basename(file))[0] for file in files]
+    identifiers = [identifier[identifier.find('_') + 1:] for identifier in identifiers]
+    return identifiers
 
 # Initialises a directory
 def initialise_directory(directory:str, remove:bool=False):
@@ -46,15 +52,12 @@ def read_raster(source:str, dtype:type=np.uint8) -> np.ndarray:
     return image
 
 # Writes an array as a raster
-def write_raster(array:np.ndarray, destination:str, source:str=None, nodata:int=0, dtype:str='uint8') -> None:
+def write_raster(array:np.ndarray, source:str, destination:str, nodata:int=0, dtype:str='uint8') -> None:
     raster = array.transpose([2, 0, 1]).astype(dtype)
     bands, height, width = raster.shape
-    if source is not None:
-        profile = rasterio.open(source).profile
-        profile.update(dtype=dtype, count=bands, nodata=nodata)
-    else:
-        profile = dict(dtype=dtype, count=bands, nodata=nodata, height=height, width=width)
-    with rasterio.open(fp=destination, mode='w', driver='GTiff', **profile) as dest:
+    profile = rasterio.open(source).profile
+    profile.update(driver='GTiff', dtype=dtype, count=bands, nodata=nodata)
+    with rasterio.open(fp=destination, mode='w', **profile) as dest:
         dest.write(raster)
         dest.close()
     
@@ -132,7 +135,7 @@ def rasterise(srcVecPath:str, srcRstPath:str, outRstPath:str, driver:str='GTiff'
     outRst = None
     
 # Converts raster to vector
-def vectorise(srcRstPath, outVecPath, driver = 'ESRI Shapefile', fieldIndex = 1, connectedness = 4, dataType = ogr.OFTIntegerList):
+def vectorise(srcRstPath, outVecPath, driver='ESRI Shapefile', fieldIndex=1, connectedness=4, dataType=ogr.OFTIntegerList):
     # import gdal, ogr, osr
     srcRst = gdal.Open(srcRstPath)
     srcBnd = srcRst.GetRasterBand(1)
@@ -144,5 +147,5 @@ def vectorise(srcRstPath, outVecPath, driver = 'ESRI Shapefile', fieldIndex = 1,
     outLay = outVec.CreateLayer(outVecPath, srs)
     # outFld = ogr.FieldDefn('FID', dataType) 
     # outLay.CreateField(outFld)
-    gdal.Polygonize(srcBnd, srcBnd, outLay, fieldIndex, ['8CONNECTED=' + str(connectedness)], callback = None)
-    del srcRst, srcBnd, outVec, outLay;
+    gdal.Polygonize(srcBnd, srcBnd, outLay, fieldIndex, ['8CONNECTED=' + str(connectedness)], callback=None)
+    del srcRst, srcBnd, outVec, outLay

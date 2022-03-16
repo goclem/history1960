@@ -1,8 +1,36 @@
-import histo1950_functions as foo 
-import ogr
-import gdal
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+'''
+@description: Workflow for the semantic segmentation example
+@author: Clement Gorin
+@contact: gorinclem@gmail.com
+@version: 2022.03.15
+'''
 
-paths = foo.set_paths()
+# Modules
+from arthisto1960_utilities import *
+from os import path
+
+#%% CLEAN IGN RASTERS
+
+paths = dict(
+    ign    = '/Users/clementgorin/Dropbox/data/ign_scan50',
+    images = '../data_1960/images'
+)
+
+srcfiles = search_files(paths['ign'], 'tif$')
+
+for srcfile in srcfiles:
+    print(path.basename(srcfile))
+    outfile = path.basename(srcfile).replace('sc50', 'image')
+    outfile = path.join(paths['images'], outfile)
+    if not path.exists(outfile):
+        os.system('gdal_translate -ot byte {srcfile} {outfile}'.format(srcfile=srcfile, outfile=outfile))
+
+
+
+
+
 files = foo.search_files(paths.Yraw, '\\.gpkg$')
 srcVecPath=files[3]
 srcRstPath='/Users/clementgorin/Dropbox/research/arthisto/data_1950/training_1950/training/lille/lille_rasters/SC50_HISTO1950_0700_7070_L93.tif'

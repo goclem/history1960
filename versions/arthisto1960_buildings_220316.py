@@ -25,28 +25,16 @@ print('GPU Available:', len(tensorflow.config.experimental.list_physical_devices
 
 # Paths
 paths = dict(
-    images_raw=  '../data_1960/raw/images',
-    labels_raw=  '../data_1960/raw/labels',
-    images_train='../data_1960/training/images',
-    labels_train='../data_1960/training/labels',
-    images_valid='../data_1960/validation/images',
-    labels_valid='../data_1960/validation/labels',
-    images_test= '../data_1960/testing/images',
-    labels_test= '../data_1960/testing/labels',
-    models=      '../data_1960/models',
-    figures=     '../data_1960/figures',
-    temporary=   '/Users/clementgorin/Temporary'
+    images='../data_1960/images',
+    labels='../data_1960/labels',
+    predictions='../data_1960/predictions',
+    models='../data_1960/models'
 )
 
 #%% FUNCTIONS
 
-def standardise_image(image:np.ndarray) -> np.ndarray:
-    bandmeans   = np.mean(image, axis=(0, 1), keepdims=True)
-    bandstds    = np.std(image,  axis=(0, 1), keepdims=True)
-    standarised = (image - bandmeans) / bandstds
-    return standarised
-
-def images_to_blocks(images:np.ndarray, imagesize:tuple, blocksize:tuple=(256, 256), shift:bool=False, mode:str='symmetric') -> np.ndarray:
+# Converts images to blocks of a given size
+def images_to_blocks(images:np.ndarray, imagesize:tuple, blocksize:tuple=(512, 512), shift:bool=False, mode:str='symmetric') -> np.ndarray:
     # Defines quantities
     nimages, imagewidth, imageheight, nbands = imagesize
     blockwidth, blockheight = blocksize
@@ -61,7 +49,8 @@ def images_to_blocks(images:np.ndarray, imagesize:tuple, blocksize:tuple=(256, 2
     blocks = blocks.reshape(-1, blockwidth, blockheight, nbands)
     return blocks
 
-def blocks_to_images(blocks:np.ndarray, imagesize:tuple, blocksize:tuple=(256, 256), shift:bool=False) ->  np.ndarray:
+# Converts blocks to images of a given size
+def blocks_to_images(blocks:np.ndarray, imagesize:tuple, blocksize:tuple=(512, 512), shift:bool=False) ->  np.ndarray:
     # Defines quantities
     nimages, imagewidth, imageheight, nbands = imagesize
     blockwidth, blockheight = blocksize
@@ -76,13 +65,15 @@ def blocks_to_images(blocks:np.ndarray, imagesize:tuple, blocksize:tuple=(256, 2
     images = images[:, padwidth:imagewidth + padwidth, padheight:imageheight + padheight, :]
     return images
 
-def sample_split(array:np.ndarray, sizes:dict, seed:int=1):
+# Splits the data multiple samples
+def sample_split(images:np.ndarray, sizes:dict, seed:int=1) -> list:
     random.seed(seed)
     samples = list(sizes.keys())
-    indexes = random.choice(samples, array.shape[0], p=list(sizes.values()))
-    samples = [array[indexes == sample, ...] for sample in samples]
+    indexes = random.choice(samples, images.shape[0], p=list(sizes.values()))
+    samples = [images[indexes == sample, ...] for sample in samples]
     return samples
 
+# Displays prediction statistics
 def display_statistics(image_test:np.ndarray, label_test:np.ndarray, proba_predict:np.ndarray, label_predict:np.ndarray) -> None:
     # Format
     image_test    = (image_test * 255).astype(int)
@@ -109,22 +100,18 @@ def display_statistics(image_test:np.ndarray, label_test:np.ndarray, proba_predi
 
 #%% PREPARES DATA
 
-"""
-Notes:
-- Vannes  (0250_6745) is incomplete
-- Orleans (0600_6770) is incomplete
-"""
+# Training tiles
+labels = search_files(paths['labels'], 'tif$')
+images = [path.join(paths['images'], path.basename(label).replace('label', 'image')) for label in labels]
 
-# Loads images as blocks
-images = search_files(paths['images_raw'], 'tif$')
+# Loads images as blocks (including shifted)
 images = np.array([read_raster(file) for file in images])
 images = np.concatenate((
     images_to_blocks(images=images, imagesize=images.shape, blocksize=(256, 256), shift=True),
     images_to_blocks(images=images, imagesize=images.shape, blocksize=(256, 256), shift=False)
 ))
 
-# Loads labels as blocks
-labels = search_files(paths['labels_raw'], 'tiff?$')
+# Loads labels as blocks (including shifted)
 labels = np.array([read_raster(file) for file in labels])
 labels = np.concatenate((
     images_to_blocks(images=labels, imagesize=labels.shape, blocksize=(256, 256), shift=True),
@@ -272,10 +259,12 @@ training = unet.fit(
     #validation_data=valid_generator,
     #validation_steps=samples_size['valid'] // 32,
     epochs=2,
-    verbose=1,
-    callbacks=train_callbacks)
+    verbose=1
+    # callbacks=train_callbacks
+)
 
-training.history
+# Saves model
+models.save_model(unet, '../data_1960/models/unet_baseline.h5')
 
 #%% EVALUATES MODEL
 
@@ -290,3 +279,30 @@ labels_predict = probas_predict >= 0.5
 for i in random.choice(range(len(images)), 5):
     display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_predict=probas_predict[i], label_predict=labels_predict[i])
 del images_test, labels_test, probas_predict, labels_predict
+
+#%% PREDICTS NEW TILES
+
+# Loads model
+unet = models.load_model('../data_1960/models/unet_baseline.h5')
+
+batch_size = 3
+files_pred = search_files(paths['images_pred'], pattern='tif$')[:20]
+batches    = [files_pred[i:i + batch_size] for i in range(0, len(files_pred), batch_size)]
+
+for batch in batches:
+    images = np.array([read_raster(file) for file in batch])
+    images = images_to_blocks(images=images, imagesize=images.shape) / 255
+    probas = unet.predict(images)
+    labels = probas >= 0.5
+    labels = blocks_to_images(labels, imagesize=(len(files_pred), 5000, 5000, 1))
+    output = [path.join(paths['labels_pred'], path.basename(file).replace('sc50', 'label')) for file in batch]
+    list(map(write_raster, labels_predict, batch, output))
+
+
+files = search_files(paths['labels_pred'], pattern='tif$')
+for file in files:
+    command = 'gdal_polygonize.py {} {}'.format(file, file.replace('tif', 'gpkg'))
+    os.system(command)
+
+for file in files_pred:
+    os.system('open {}'.format(file))

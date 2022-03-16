@@ -22,3 +22,10 @@
 #     pyplot.imsave(fname=filename('label_test', i), arr=labels_test[i])
 
 # del(images_train, labels_valid, images_valid, labels_valid, images_test, labels_test)
+
+
+def standardise_image(image:np.ndarray) -> np.ndarray:
+    bandmeans   = np.mean(image, axis=(0, 1), keepdims=True)
+    bandstds    = np.std(image,  axis=(0, 1), keepdims=True)
+    standarised = (image - bandmeans) / bandstds
+    return standarised
