@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-@description: Workflow for the semantic segmentation example
+@description: Prepares data for the Arthisto1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.03.15
+@version: 2022.03.18
 '''
 
-# Modules
+#%% MODULES
 from arthisto1960_utilities import *
 from os import path
 
-#%% CLEAN IGN RASTERS
-
 paths = dict(
-    ign    = '/Users/clementgorin/Dropbox/data/ign_scan50',
-    images = '../data_1960/images'
+    images_raw='/Users/clementgorin/Dropbox/data/ign_scan50',
+    labels_raw='../shared_ras/training1960',
+    images='../data_1960/images', 
+    labels='../data_1960/labels'
 )
 
-srcfiles = search_files(paths['ign'], 'tif$')
+#%% FORMATS IMAGES
+
+srcfiles = search_files(paths['images_raw'], 'tif$')
 
 for srcfile in srcfiles:
     print(path.basename(srcfile))
@@ -27,40 +29,18 @@ for srcfile in srcfiles:
     if not path.exists(outfile):
         os.system('gdal_translate -ot byte {srcfile} {outfile}'.format(srcfile=srcfile, outfile=outfile))
 
+#%% FORMATS LABELS
 
+# Builds file paths
+srclabels = search_files(directory=paths['labels_raw'], pattern='label_\\d{4}_\\d{4}\\.gpkg$')
+srclabels = list(filter(re.compile('^(?!.*(incomplete|pending)).*').search, srclabels)) # Drops incomplete tiles
+srcimages = search_files(directory=paths['labels_raw'], pattern=identifiers(srclabels, regex=True) + '.tif')
+outlabels = [path.join(paths['labels'], path.basename(file).replace('.gpkg', '.tif')) for file in srclabels]
 
+# Rasterises label vectors
+for srclabel, srcimage, outlabel in zip(srclabels, srcimages, outlabels):
+    rasterise(srcVecPath=srclabel, srcRstPath=srcimage, outRstPath=outlabel, burnValue=1)
+del srclabels, srcimages, outlabels
 
-
-files = foo.search_files(paths.Yraw, '\\.gpkg$')
-srcVecPath=files[3]
-srcRstPath='/Users/clementgorin/Dropbox/research/arthisto/data_1950/training_1950/training/lille/lille_rasters/SC50_HISTO1950_0700_7070_L93.tif'
-outRstPath=os.path.join(paths.desktop, 'try.tif')
-outVecPath=os.path.join(paths.desktop, 'try.gpkg')
-# Computes training rasters
-
-
-
-
-
-def rasterise(srcRstPath, srcVecPath, outRstPath, burnValue=1, burnField=None, noData=0, dataType=gdal.GDT_Byte):
-    # Drivers
-    vecDrv = ogr.GetDriverByName('GPKG')
-    rstDrv = gdal.GetDriverByName('GTiff')
-    # Source data
-    srcVec = vecDrv.Open(srcVecPath, 0)
-    srcRst = gdal.Open(srcRstPath, 0)
-    srcLay = srcVec.GetLayer()
-    # Output raster
-    outRst = rstDrv.Create(outRstPath, srcRst.RasterXSize, srcRst.RasterYSize, 1, dataType)
-    outRst.SetGeoTransform(srcRst.GetGeoTransform())
-    outRst.SetProjection(srcRst.GetProjection())
-    # Output band
-    outBnd = outRst.GetRasterBand(1)
-    outBnd.Fill(noData)
-    outBnd.SetNoDataValue(noData)        
-    # Rasterise
-    if burnField is not None:
-        gdal.RasterizeLayer(outRst, [1], srcLay, options=["ATTRIBUTE=" + burnField])
-    else:
-        gdal.RasterizeLayer(outRst, [1], srcLay, burn_values=[burnValue])
-    outRst = outBnd = None
+training = search_files(directory=paths['labels_raw'], pattern='label_\\d{4}_\\d{4}\\.gpkg$')
+identifiers(srclabels, regex=True)

@@ -29,3 +29,19 @@ def standardise_image(image:np.ndarray) -> np.ndarray:
     bandstds    = np.std(image,  axis=(0, 1), keepdims=True)
     standarised = (image - bandmeans) / bandstds
     return standarised
+
+
+def display_statistics(image_test:np.ndarray, label_test:np.ndarray, proba_pred:np.ndarray, label_pred:np.ndarray, masks:np.ndarray) -> None:
+        # Augmented images
+        colour  = (255, 255, 0)
+        images  = [np.where(np.tile(mask, (1, 1, 3)), colour, image_test) for mask in masks]
+        # Figure
+        images = [image_test, label_test, proba_pred, label_pred] + images
+        titles = ['Test image', 'Test label', 'Predicted probability', 'Predicted label', 'True positive', 'True negative', 'False positive', 'False negative']
+        fig, axs = pyplot.subplots(2, 4, figsize=(20, 10))
+        for image, title, ax in zip(images, titles, axs.ravel()):
+            ax.imshow(image)
+            ax.set_title(title, fontsize=20)
+            ax.axis('off')
+        pyplot.tight_layout(pad=2.0)
+        pyplot.show()

@@ -1,8 +1,8 @@
 # !/usr/bin/env Rscript
-# Description: Manages data for the Arthisto1960 project
+# Description: Prepares data for the Arthisto1960 project
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Version: 2022.01.24
+# Version: 2022.03.18
 
 # Packages
 pacman::p_load(data.table, sf, stringr, dplyr, rgeos)
@@ -26,7 +26,7 @@ tiles <- mutate(tiles, id = str_replace(id, "SC50_HISTO1950", "sc50"))
 tiles <- mutate(tiles, id = str_remove(id, "_L93"))
 st_write(tiles, "tiles/tiles_1960.gpkg", quiet = T, delete_dsn = T)
 
-# Computes tile style -----------------------------------------------------
+# Computes legends 1960 ---------------------------------------------------
 
 maps    <- st_read("tiles/maps_1960.gpkg", quiet = T)
 tiles   <- st_read("tiles/tiles_1960.gpkg", quiet = T)

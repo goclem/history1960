@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-@description: Workflow for the semantic segmentation example
+@description: Performs predictions for the Arthisto 1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
 @version: 2022.03.15
@@ -16,8 +16,9 @@ import tensorflow
 
 from arthisto1960_utilities import *
 from numpy import random
+from pandas import DataFrame
 from os import path
-from tensorflow.keras import callbacks, layers, models, preprocessing
+from tensorflow.keras import callbacks, layers, models, preprocessing, utils
 
 # TensorFlow
 print('TensorFlow version:', tensorflow.__version__)
@@ -28,9 +29,13 @@ paths = dict(
     data='../data_1960',
     images='../data_1960/images',
     labels='../data_1960/labels',
+    models='../data_1960/models',
     predictions='../data_1960/predictions',
-    models='../data_1960/models'
+    statistics='../data_1960/statistics'
 )
+
+# Clears QGIS auxiliary files
+# [os.remove(file) for file in search_files(directory=paths['data'], pattern='.tif.aux.xml')]
 
 #%% FUNCTIONS
 
@@ -116,7 +121,7 @@ def display_statistics(image_test:np.ndarray, label_test:np.ndarray, proba_pred:
 
 # Training tiles
 pattern = identifiers(search_files(paths['labels'], 'tif$'))
-pattern = '({}).tif'.format('|'.join(pattern))
+pattern = '({}).tif$'.format('|'.join(pattern))
 
 # Loads images as blocks (including shifted)
 images = search_files(directory=paths['images'], pattern=pattern)
@@ -190,53 +195,69 @@ del augmentation, data_generator, images_generator, labels_generator, images_tra
 
 #%% INITIALISES MODEL
 
-def conv_block(tensor, n_filters, dropout=0, kernel_size=(3, 3), padding='same', initializer='he_normal'):
-    tensor = layers.Conv2D(filters=n_filters, kernel_size=kernel_size, padding=padding, kernel_initializer=initializer)(tensor)
-    tensor = layers.Activation('relu')(tensor)
-    tensor = layers.BatchNormalization()(tensor)
-    tensor = layers.Conv2D(filters=n_filters, kernel_size=kernel_size, padding=padding, kernel_initializer=initializer)(tensor)
-    tensor = layers.Activation('relu')(tensor)
-    tensor = layers.BatchNormalization()(tensor)
-    tensor = layers.SpatialDropout2D(dropout)(tensor)
-    return tensor
+'''
+Notes:
+- Check the number of filters for transpose, we should maintian dimensionality
+- Compare the model summary with the original U-net to make sure everything is ok
+- May be better https://pyimagesearch.com/2022/02/21/u-net-image-segmentation-in-keras/
+'''
 
-def deconv_block(tensor, residual, n_filters, kernel_size=(3, 3), padding='same', strides=(2, 2), dropout=0):
-    tensor = layers.Conv2DTranspose(n_filters, kernel_size=kernel_size, strides=strides, padding=padding)(tensor)
-    tensor = layers.concatenate([tensor, residual], axis=3)
-    tensor = conv_block(tensor=tensor, n_filters=n_filters, dropout=dropout)
-    return tensor
+def convolutional_block(input, filters:int, dropout:float=0, kernel_size:dict=(3, 3), padding:str='same', initializer:str='he_normal', name:str=''):
+    convolution   = layers.Conv2D(filters=filters, kernel_size=kernel_size, padding=padding, kernel_initializer=initializer, use_bias=False, name=f'{name}_convolution1')(input)
+    activation    = layers.Activation(activation='relu', name=f'{name}_activation1')(convolution)
+    normalisation = layers.BatchNormalization(name=f'{name}_normalisation1')(activation)
+    convolution   = layers.Conv2D(filters=filters, kernel_size=kernel_size, padding=padding, kernel_initializer=initializer, use_bias=False, name=f'{name}_convolution2')(normalisation)
+    activation    = layers.Activation(activation='relu', name=f'{name}_activation2')(convolution)
+    normalisation = layers.BatchNormalization(name=f'{name}_normalisation2')(activation)
+    dropout       = layers.SpatialDropout2D(rate=dropout, name=f'{name}_dropout')(normalisation)
+    return dropout
 
-def init_unet(n_classes:int, input_size:tuple, n_filters:int):
+def deconvolutional_block(input, skip, filters:int, kernel_size:dict=(3, 3), padding:str='same', strides:dict=(2, 2), dropout:float=0, name:str=''):
+    transpose     = layers.Conv2DTranspose(filters=filters, kernel_size=kernel_size, strides=strides, padding=padding, name=f'{name}_transpose')(input)
+    concatenation = layers.concatenate(inputs=[transpose, skip], axis=3, name=f'{name}_concatenation')
+    convblock     = convolutional_block(input=concatenation, filters=filters, dropout=dropout, name=name)
+    return convblock
+
+def init_unet(n_classes:int, input_size:tuple, filters:int):
     # Input
-    inputs  = layers.Input(shape=input_size, name='image_input')
+    inputs = layers.Input(shape=input_size, name='input')
     # Contraction
-    block1 = conv_block(inputs, n_filters=n_filters*1, dropout=0.1)
-    mpool1 = layers.MaxPooling2D(pool_size=(2, 2))(block1)
-    block2 = conv_block(mpool1, n_filters=n_filters*2, dropout=0.1)
-    mpool2 = layers.MaxPooling2D(pool_size=(2, 2))(block2)
-    block3 = conv_block(mpool2, n_filters=n_filters*4, dropout=0.2)
-    mpool3 = layers.MaxPooling2D(pool_size=(2, 2))(block3)
-    block4 = conv_block(mpool3, n_filters=n_filters*8, dropout=0.2)
-    mpool4 = layers.MaxPooling2D(pool_size=(2, 2))(block4)
+    convblock1 = convolutional_block(input=inputs, filters=filters*1, dropout=0.1, name='convblock1')
+    maxpool1   = layers.MaxPool2D(pool_size=(2, 2), name='convblock1_maxpool')(convblock1)
+    convblock2 = convolutional_block(input=maxpool1, filters=filters*2, dropout=0.1, name='convblock2')
+    maxpool2   = layers.MaxPool2D(pool_size=(2, 2), name='convblock2_maxpool')(convblock2)
+    convblock3 = convolutional_block(input=maxpool2, filters=filters*4, dropout=0.2, name='convblock3')
+    maxpool3   = layers.MaxPool2D(pool_size=(2, 2), name='convblock3_maxpool')(convblock3)
+    convblock4 = convolutional_block(input=maxpool3, filters=filters*8, dropout=0.2, name='convblock4')
+    maxpool4   = layers.MaxPool2D(pool_size=(2, 2), name='convblock4_maxpool')(convblock4)
     # Bottleneck
-    block5 = conv_block(mpool4, n_filters=n_filters*16, dropout=0.3)
+    convblock5 = convolutional_block(input=maxpool4, filters=filters*16, dropout=0.3, name='convblock5')
     # Extension
-    block6 = deconv_block(block5, residual=block4, n_filters=n_filters*8, dropout=0.3)
-    block7 = deconv_block(block6, residual=block3, n_filters=n_filters*4, dropout=0.2)
-    block8 = deconv_block(block7, residual=block2, n_filters=n_filters*2, dropout=0.2)
-    block9 = deconv_block(block8, residual=block1, n_filters=n_filters*1, dropout=0.1)
+    deconvblock1 = deconvolutional_block(input=convblock5,   skip=convblock4, filters=filters*8, dropout=0.3, name='deconvblock1')
+    deconvblock2 = deconvolutional_block(input=deconvblock1, skip=convblock3, filters=filters*4, dropout=0.2, name='deconvblock2')
+    deconvblock3 = deconvolutional_block(input=deconvblock2, skip=convblock2, filters=filters*2, dropout=0.2, name='deconvblock3')
+    deconvblock4 = deconvolutional_block(input=deconvblock3, skip=convblock1, filters=filters*1, dropout=0.1, name='deconvblock4')
     # Output
-    outputs = layers.Conv2D(n_classes, kernel_size=(1, 1), activation='sigmoid')(block9)
+    output = layers.Conv2D(n_classes, kernel_size=(1, 1), activation='sigmoid', name='output')(deconvblock4)
     # Model
-    model   = models.Model(inputs=inputs, outputs=outputs, name='Unet')
+    model   = models.Model(inputs=inputs, outputs=output, name='Unet')
     return model
 
-unet = init_unet(n_classes=1, input_size=(256, 256, 3), n_filters=16)
-unet.summary()
+unet = init_unet(n_classes=1, input_size=(256, 256, 3), filters=64)
 unet.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['accuracy', 'Recall', 'Precision'])
-del conv_block, deconv_block
+del convolutional_block, deconvolutional_block
 
+# Summary
+# unet.summary()
+summary = DataFrame([dict(Name=layer.name, Type=layer.__class__.__name__, Shape=layer.output_shape, Params=layer.count_params()) for layer in unet.layers])
+summary.style.to_html(path.join(paths['models'], 'unet_structure.html'), index=False) 
+del summary
+
+utils.plot_model(unet, to_file=path.join(paths['models'], 'unet_structure.pdf'), show_shapes=True)`
 #%% ESTIMATES PARAMETERS
+
+# Loads model if estimated previously
+# unet = models.load_model('../data_1960/models/unet_baseline.h5')
 
 # Callbacks
 train_callbacks = [
@@ -245,6 +266,7 @@ train_callbacks = [
     callbacks.BackupAndRestore(backup_dir='../data_1960/models')
 ]
 
+# Training
 training = unet.fit(
     train_generator,
     steps_per_epoch=samples_size['train'] // 32,
@@ -255,8 +277,8 @@ training = unet.fit(
 )
 
 # Saves model and training history
-models.save_model(unet, '../data_1960/models/unet_baseline.h5')
-np.save('../data_1960/models/history_baseline.npy', training.history)
+# models.save_model(unet, '../data_1960/models/unet_baseline.h5')
+# np.save('../data_1960/models/history_baseline.npy', training.history)
 
 # Displays history
 # history = np.load('../data_1960/models/history_baseline.npy',allow_pickle=True).item()
@@ -273,9 +295,15 @@ np.save('../data_1960/models/history_baseline.npy', training.history)
 # Displays statistics
 probas_pred = unet.predict(images_test, verbose=1)
 labels_pred = probas_pred >= 0.5
-for i in random.choice(range(len(images_test)), 5):
-    display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_pred=probas_pred[i], label_pred=labels_pred[i])
-del images_test, labels_test, probas_pred, labels_pred
+
+# Saves test data for statistics
+for data in ['images_test', 'labels_test', 'probas_pred', 'labels_pred']:
+    np.save(path.join(paths['statistics'], data + '.npy'), globals()[data])
+
+# Displays prediction statistics
+# for i in random.choice(range(len(images_test)), 5):
+#     display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_pred=probas_pred[i], label_pred=labels_pred[i])
+# del images_test, labels_test, probas_pred, labels_pred
 
 #%% PREDICTS NEW TILES
 
@@ -309,34 +337,3 @@ for files in batches:
     for proba, file, outfile in zip(probas, files, outfiles):
         write_raster(array=proba, source=file, destination=outfile, nodata=-1, dtype='float32')
 
-#%% FORMATS PREDICTIONS
-
-# Computes labels and vectors
-files = search_files(paths['predictions'], pattern='proba.*tif$')
-for file in files:
-    print(path.basename(file))
-    outfile = file.replace('proba', 'label')
-    os.system('gdal_calc.py --overwrite -A {} --outfile={} --calc="A>=0.5" --NoDataValue=0 --type=Byte --quiet'.format(file, outfile))
-    os.system('gdal_polygonize.py {} {} -q'.format(outfile, outfile.replace('tif', 'gpkg')))
-    os.remove(outfile)
-del files, outfile
-
-# Aggregates all vectors
-pattern = path.join(paths['predictions'], '*.gpkg')
-outfile = path.join(paths['data'], 'building1960.gpkg')
-os.system('ogrmerge.py -single -overwrite_ds -f GPKG -o {} {}'.format(outfile, pattern))
-os.system('find {}/ -name "*.gpkg$" -type f -delete'.format(paths['predictions']))
-del pattern, outfile
-
-# Open files for checking
-pattern = search_files(directory=paths['predictions'], pattern='proba.*tif$')
-pattern = '({}).tif'.format('|'.join(identifiers(pattern)))
-files   = search_files(directory=paths['images'], pattern=training)
-for file in files:
-    os.system('open {}'.format(file))
-
-#%% UTILITIES
-
-training    = '(0350_6695|0400_6445|0550_6295|0575_6295|0700_6520|0700_6545|0700_7070|0875_6245|0875_6270|0900_6245|0900_6270|0900_6470|1025_6320).tif'
-legend_1900 = '(0600_6895|0625_6895|0600_6870|0625_6870|0625_6845|0600_6845|0650_6895|0650_6870|0650_6845|0675_6895|0675_6870|0675_6845|0850_6545|0825_6545|0850_6520|0825_6520|0825_6495).tif'
-legend_N    = '(0400_6570|0425_6570|0400_6595|0425_6595|0425_6545|0400_6545|0425_6520|0400_6520|0425_6395|0425_6420|0400_6395|0400_6420|0425_6720|0450_6720|0425_6745|0450_6745|0450_6695|0425_6695|0425_6670|0450_6670|0450_6570|0450_6595|0450_6545|0450_6520|0450_6945|0450_6920|0475_6920|0475_6795|0500_6795|0475_6770|0500_6770|0500_6720|0475_6720|0475_6695|0500_6695|0475_6670|0450_6645|0475_6645|0500_6645|0525_6670|0500_6670|0525_6645|0500_6620|0525_6620|0475_6620|0550_6820|0525_6820|0550_6895|0575_6895|0550_6870|0575_6870|0575_6845|0550_6845|0550_6670|0575_6670|0550_6695|0575_6695|0575_6645|0550_6645|0475_6495|0450_6495|0475_6470|0450_6470|0450_6420|0450_6395|0475_6420|0475_6395|0475_6320|0500_6320|0525_6495|0500_6495|0500_6520|0525_6520|0525_6320|0525_6345|0500_6345|0600_6670|0600_6695|0600_6645|0625_6495|0650_6495|0650_6520|0625_6520|0725_6320|0700_6320|0725_6345|0700_6345|0775_6420|0750_6420|0725_6420|0775_6445|0750_6445|0725_6445|0775_6395|0725_6395|0750_6395|0775_6370|0800_6370|0775_6345|0800_6345|1150_6170|1150_6145|1150_6120|1175_6195|1150_6195|1175_6170|1175_6145|1175_6120|1175_6095|1150_6095|1200_6095|1175_6070|1200_6070|1200_6220|1200_6195|1175_6220|1200_6170|1200_6145|1225_6170|1225_6145|1200_6120|1225_6120|1225_6095|1250_6120|1250_6145).tif'

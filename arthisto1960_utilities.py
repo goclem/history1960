@@ -31,9 +31,12 @@ def search_files(directory:str, pattern:str='.') -> list:
     return files
 
 # Extracts file identifiers
-def identifiers(files:list) -> list:
+def identifiers(files:list, regex:bool=False) -> list:
     identifiers = [os.path.splitext(os.path.basename(file))[0] for file in files]
     identifiers = [identifier[identifier.find('_') + 1:] for identifier in identifiers]
+    identifiers.sort()
+    if regex:
+        identifiers = '({})'.format('|'.join(identifiers))
     return identifiers
 
 # Initialises a directory
