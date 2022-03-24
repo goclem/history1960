@@ -14,7 +14,6 @@ import itertools
 import numpy as np
 import tensorflow
 
-from arthisto1960_model import binary_unet
 from arthisto1960_utilities import *
 from numpy import random
 from pandas import DataFrame
@@ -155,6 +154,7 @@ del is_empty, keep
 #     compare(images=[images[i], labels[i]], titles=['Image', 'Label'])
 
 #%%  COMPUTES SAMPLES
+# Declare seed
 samples_size = dict(train=0.8, valid=0.1, test=0.1)
 images_train, images_valid, images_test = sample_split(images=images, sizes=samples_size, seed=1)
 labels_train, labels_valid, labels_test = sample_split(images=labels, sizes=samples_size, seed=1)
@@ -173,10 +173,10 @@ augmentation = dict(
     horizontal_flip=True, 
     vertical_flip=True,
     rotation_range=45, 
-    width_shift_range=0.1,
-    height_shift_range=0.1,
-    brightness_range=[0.9,1.1],
-    zoom_range=[0.9, 1.1],
+    width_shift_range=0.25,
+    height_shift_range=0.25,
+    brightness_range=[0.75,1.25],
+    zoom_range=[0.75, 1.25],
     fill_mode='reflect'
 )
 
@@ -193,29 +193,81 @@ del augmentation, data_generator, images_generator, labels_generator, images_tra
 #     compare(images=[images[i], labels[i]], titles=['Image', 'Label'])
 # del images, labels
 
-#%% ESTIMATES PARAMETERS
+#%% INITIALISES MODEL
 
-# Initialises model
-model = binary_unet(input_shape=(256, 256, 3), filters=32)
-model.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['accuracy', 'Recall', 'Precision'])
-# model = models.load_model('../data_1960/models/unet32_epoch012.h5')
+'''
+Notes:
+- Check the number of filters for transpose, we should maintian dimensionality
+- Compare the model summary with the original U-net to make sure everything is ok
+- May be better https://pyimagesearch.com/2022/02/21/u-net-image-segmentation-in-keras/
+'''
+
+def convolutional_block(input, filters:int, dropout:float=0, kernel_size:dict=(3, 3), padding:str='same', initializer:str='he_normal', name:str=''):
+    convolution   = layers.Conv2D(filters=filters, kernel_size=kernel_size, padding=padding, kernel_initializer=initializer, use_bias=False, name=f'{name}_convolution1')(input)
+    activation    = layers.Activation(activation='relu', name=f'{name}_activation1')(convolution)
+    normalisation = layers.BatchNormalization(name=f'{name}_normalisation1')(activation)
+    convolution   = layers.Conv2D(filters=filters, kernel_size=kernel_size, padding=padding, kernel_initializer=initializer, use_bias=False, name=f'{name}_convolution2')(normalisation)
+    activation    = layers.Activation(activation='relu', name=f'{name}_activation2')(convolution)
+    normalisation = layers.BatchNormalization(name=f'{name}_normalisation2')(activation)
+    dropout       = layers.SpatialDropout2D(rate=dropout, name=f'{name}_dropout')(normalisation)
+    return dropout
+
+def deconvolutional_block(input, skip, filters:int, kernel_size:dict=(3, 3), padding:str='same', strides:dict=(2, 2), dropout:float=0, name:str=''):
+    transpose     = layers.Conv2DTranspose(filters=filters, kernel_size=kernel_size, strides=strides, padding=padding, name=f'{name}_transpose')(input)
+    concatenation = layers.concatenate(inputs=[transpose, skip], axis=3, name=f'{name}_concatenation')
+    convblock     = convolutional_block(input=concatenation, filters=filters, dropout=dropout, name=name)
+    return convblock
+
+def init_unet(n_classes:int, input_size:tuple, filters:int):
+    # Input
+    inputs = layers.Input(shape=input_size, name='input')
+    # Contraction
+    convblock1 = convolutional_block(input=inputs, filters=filters*1, dropout=0.1, name='convblock1')
+    maxpool1   = layers.MaxPool2D(pool_size=(2, 2), name='convblock1_maxpool')(convblock1)
+    convblock2 = convolutional_block(input=maxpool1, filters=filters*2, dropout=0.1, name='convblock2')
+    maxpool2   = layers.MaxPool2D(pool_size=(2, 2), name='convblock2_maxpool')(convblock2)
+    convblock3 = convolutional_block(input=maxpool2, filters=filters*4, dropout=0.2, name='convblock3')
+    maxpool3   = layers.MaxPool2D(pool_size=(2, 2), name='convblock3_maxpool')(convblock3)
+    convblock4 = convolutional_block(input=maxpool3, filters=filters*8, dropout=0.2, name='convblock4')
+    maxpool4   = layers.MaxPool2D(pool_size=(2, 2), name='convblock4_maxpool')(convblock4)
+    # Bottleneck
+    convblock5 = convolutional_block(input=maxpool4, filters=filters*16, dropout=0.3, name='convblock5')
+    # Extension
+    deconvblock1 = deconvolutional_block(input=convblock5,   skip=convblock4, filters=filters*8, dropout=0.3, name='deconvblock1')
+    deconvblock2 = deconvolutional_block(input=deconvblock1, skip=convblock3, filters=filters*4, dropout=0.2, name='deconvblock2')
+    deconvblock3 = deconvolutional_block(input=deconvblock2, skip=convblock2, filters=filters*2, dropout=0.2, name='deconvblock3')
+    deconvblock4 = deconvolutional_block(input=deconvblock3, skip=convblock1, filters=filters*1, dropout=0.1, name='deconvblock4')
+    # Output
+    output = layers.Conv2D(n_classes, kernel_size=(1, 1), activation='sigmoid', name='output')(deconvblock4)
+    # Model
+    model   = models.Model(inputs=inputs, outputs=output, name='Unet')
+    return model
+
+unet = init_unet(n_classes=1, input_size=(256, 256, 3), filters=64)
+unet.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['accuracy', 'Recall', 'Precision'])
+del convolutional_block, deconvolutional_block
 
 # Summary
-# model.summary()
-# summary = DataFrame([dict(Name=layer.name, Type=layer.__class__.__name__, Shape=layer.output_shape, Params=layer.count_params()) for layer in model.layers])
-# summary.style.to_html(path.join(paths['models'], 'unet32_structure.html'), index=False) 
-# del summary
-# utils.plot_model(model, to_file=path.join(paths['models'], 'unet32_structure.pdf'), show_shapes=True)
+# unet.summary()
+summary = DataFrame([dict(Name=layer.name, Type=layer.__class__.__name__, Shape=layer.output_shape, Params=layer.count_params()) for layer in unet.layers])
+summary.style.to_html(path.join(paths['models'], 'unet_structure.html'), index=False) 
+del summary
+
+utils.plot_model(unet, to_file=path.join(paths['models'], 'unet_structure.pdf'), show_shapes=True)`
+#%% ESTIMATES PARAMETERS
+
+# Loads model if estimated previously
+# unet = models.load_model('../data_1960/models/unet_baseline.h5')
 
 # Callbacks
 train_callbacks = [
     callbacks.EarlyStopping(monitor='val_accuracy', patience=3, restore_best_weights=True),
-    callbacks.ModelCheckpoint(filepath='../data_1960/models/unet32_{epoch:03d}.h5', monitor='val_accuracy', save_best_only=True),
+    callbacks.ModelCheckpoint(filepath='../data_1960/models/unet_{epoch:02d}_{val_accuracy:.4f}.h5', monitor='val_accuracy', save_best_only=True),
     callbacks.BackupAndRestore(backup_dir='../data_1960/models')
 ]
 
 # Training
-training = model.fit(
+training = unet.fit(
     train_generator,
     steps_per_epoch=samples_size['train'] // 32,
     validation_data=(images_valid, labels_valid),
@@ -225,8 +277,8 @@ training = model.fit(
 )
 
 # Saves model and training history
-# models.save_model(model, '../data_1960/models/unet32_baseline.h5')
-# np.save('../data_1960/models/unet32_history.npy', training.history)
+# models.save_model(unet, '../data_1960/models/unet_baseline.h5')
+# np.save('../data_1960/models/history_baseline.npy', training.history)
 
 # Displays history
 # history = np.load('../data_1960/models/history_baseline.npy',allow_pickle=True).item()
@@ -235,16 +287,13 @@ training = model.fit(
 
 #%% EVALUATES MODEL
 
-# Loads model if estimated previously
-# unet = models.load_model('../data_1960/models/unet32_baseline.h5')
-
 # Compute statistics
-# performance = unet.evaluate(images_test, labels_test)
+# performance = unet.evaluate(images_test, labels_test) # 81%
 # print('Test loss: {:.4f}\nTest accuracy: {:.4f}\nTest recall: {:.4f}\nTest precision: {:.4f}'.format(*performance))
 # del performance
 
 # Displays statistics
-probas_pred = model.predict(images_test, verbose=1)
+probas_pred = unet.predict(images_test, verbose=1)
 labels_pred = probas_pred >= 0.5
 
 # Saves test data for statistics
@@ -252,23 +301,20 @@ for data in ['images_test', 'labels_test', 'probas_pred', 'labels_pred']:
     np.save(path.join(paths['statistics'], data + '.npy'), globals()[data])
 
 # Displays prediction statistics
-for i in random.choice(range(len(images_test)), 5):
-    display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_pred=probas_pred[i], label_pred=labels_pred[i])
-del images_test, labels_test, probas_pred, labels_pred
+# for i in random.choice(range(len(images_test)), 5):
+#     display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_pred=probas_pred[i], label_pred=labels_pred[i])
+# del images_test, labels_test, probas_pred, labels_pred
 
 #%% PREDICTS NEW TILES
 
 # Loads model
-# tensorflow.compat.v1.logging.get_verbosity()
-# tensorflow.compat.v1.logging.set_verbosity(tensorflow.compat.v1.logging.ERROR)
-model = models.load_model('../data_1960/models/unet32_baseline.h5')
+unet = models.load_model('../data_1960/models/unet_baseline.h5')
 
 # Lists batches
-batch_size = 3
+batch_size = 5
 batches = search_files(paths['images'], pattern='tif$')
-batches = filter_identifiers(batches, search_files(paths['predictions'], pattern='tif$'))
+batches = search_files(paths['images'], pattern=training)
 batches = [batches[i:i + batch_size] for i in range(0, len(batches), batch_size)]
-del batch_size
 
 # Computes predictions
 def predict_tiles(model, files):
@@ -276,20 +322,18 @@ def predict_tiles(model, files):
     images  = layers.Rescaling(1./255)(images)
     blocks1 = images_to_blocks(images=images, imagesize=images.shape, blocksize=(256, 256), shift=False)
     blocks2 = images_to_blocks(images=images, imagesize=images.shape, blocksize=(256, 256), shift=True)
-    probas1 = model.predict(blocks1, verbose=1)
-    probas2 = model.predict(blocks2, verbose=1)
-    probas1 = blocks_to_images(blocks=probas1, imagesize=images.shape[:3] + (1,), blocksize=(256, 256), shift=False)
-    probas2 = blocks_to_images(blocks=probas2, imagesize=images.shape[:3] + (1,), blocksize=(256, 256), shift=True)
+    probas1 = unet.predict(blocks1)
+    probas2 = unet.predict(blocks2)
+    probas1 = blocks_to_images(probas1, imagesize=images.shape[:3] + (1,), blocksize=(256, 256), shift=False)
+    probas2 = blocks_to_images(probas2, imagesize=images.shape[:3] + (1,), blocksize=(256, 256), shift=True)
     probas  = (probas1 + probas2) / 2
     del blocks1, blocks2, probas1, probas2
     return probas
 
 # Computes predictions
-for i, files in enumerate(batches):
-    print('Batch {:d}/{:d}'.format(i + 1, len(batches)))
-    probas   = predict_tiles(model=model, files=files)
+for files in batches:
+    probas   = predict_tiles(unet, files)
     outfiles = [path.join(paths['predictions'], path.basename(file).replace('image', 'proba')) for file in files]
     for proba, file, outfile in zip(probas, files, outfiles):
         write_raster(array=proba, source=file, destination=outfile, nodata=-1, dtype='float32')
-    del probas, outfiles
-# %%
+

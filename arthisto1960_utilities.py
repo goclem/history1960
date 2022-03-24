@@ -15,10 +15,11 @@ import os
 import re
 import shutil
 
+from itertools import compress
 from matplotlib import pyplot
 from osgeo import gdal, ogr, osr
 
-#%% FUNCTIONS
+#%% FILES
 
 # Lists files in a directory that match a regular expression
 def search_files(directory:str, pattern:str='.') -> list:
@@ -39,6 +40,12 @@ def identifiers(files:list, regex:bool=False) -> list:
         identifiers = '({})'.format('|'.join(identifiers))
     return identifiers
 
+# Filters by identifiers
+def filter_identifiers(files:list, filter:list) -> list:    
+    subset = np.isin(identifiers(files), identifiers(filter), invert=True)
+    subset = list(compress(files, subset))
+    return subset
+
 # Initialises a directory
 def initialise_directory(directory:str, remove:bool=False):
     if not os.path.exists(directory):
@@ -47,22 +54,7 @@ def initialise_directory(directory:str, remove:bool=False):
         shutil.rmtree(directory)
         os.mkdir(directory)
 
-# Reads a raster as an array
-def read_raster(source:str, dtype:type=np.uint8) -> np.ndarray:
-    raster = rasterio.open(source)
-    raster = raster.read()
-    image  = raster.transpose([1, 2, 0]).astype(dtype)
-    return image
-
-# Writes an array as a raster
-def write_raster(array:np.ndarray, source:str, destination:str, nodata:int=0, dtype:str='uint8') -> None:
-    raster = array.transpose([2, 0, 1]).astype(dtype)
-    bands, height, width = raster.shape
-    profile = rasterio.open(source).profile
-    profile.update(driver='GTiff', dtype=dtype, count=bands, nodata=nodata)
-    with rasterio.open(fp=destination, mode='w', **profile) as dest:
-        dest.write(raster)
-        dest.close()
+#%% DISPLAY
     
 # Displays an image
 def display(image:np.ndarray, title:str='', cmap:str='gray') -> None:
@@ -88,18 +80,24 @@ def compare(images:list, titles:list=['Image'], cmaps:list=['gray']) -> None:
     pyplot.tight_layout()
     pyplot.show()
 
-# Displays a random sample of images
-def display_sample(images:np.ndarray, gridsize:int=3, seed:int=None) -> None:
-    np.random.seed(seed)
-    sample  = np.random.choice(range(images.shape[0]), gridsize * gridsize)
-    images  = images[sample]
-    fig, axs = pyplot.subplots(nrows=gridsize, ncols=gridsize, figsize=(10, 10))
-    for image, ax in zip(images, axs.ravel()):
-        ax.imshow(image)
-        ax.axis('off')
-    fig.suptitle('Sampled images', fontsize=20)
-    pyplot.tight_layout()
-    pyplot.show()
+#%% RASTERS
+
+# Reads a raster as an array
+def read_raster(source:str, dtype:type=np.uint8) -> np.ndarray:
+    raster = rasterio.open(source)
+    raster = raster.read()
+    image  = raster.transpose([1, 2, 0]).astype(dtype)
+    return image
+
+# Writes an array as a raster
+def write_raster(array:np.ndarray, source:str, destination:str, nodata:int=0, dtype:str='uint8') -> None:
+    raster = array.transpose([2, 0, 1]).astype(dtype)
+    bands, height, width = raster.shape
+    profile = rasterio.open(source).profile
+    profile.update(driver='GTiff', dtype=dtype, count=bands, nodata=nodata)
+    with rasterio.open(fp=destination, mode='w', **profile) as dest:
+        dest.write(raster)
+        dest.close()
 
 # Converts vector to raster
 def rasterise(srcVecPath:str, srcRstPath:str, outRstPath:str, driver:str='GTiff', burnField:str=None, burnValue:int=1, noDataValue:int=0, dataType:int=gdal.GDT_Byte):
@@ -136,19 +134,3 @@ def rasterise(srcVecPath:str, srcRstPath:str, outRstPath:str, driver:str='GTiff'
     else:
         gdal.RasterizeLayer(outRst, [1], srcLay, burn_values = [burnValue])
     outRst = None
-    
-# Converts raster to vector
-def vectorise(srcRstPath, outVecPath, driver='ESRI Shapefile', fieldIndex=1, connectedness=4, dataType=ogr.OFTIntegerList):
-    # import gdal, ogr, osr
-    srcRst = gdal.Open(srcRstPath)
-    srcBnd = srcRst.GetRasterBand(1)
-    driver = ogr.GetDriverByName(driver)
-    if os.path.exists(outVecPath):
-        driver.DeleteDataSource(outVecPath)
-    outVec = driver.CreateDataSource(outVecPath)
-    srs    = osr.SpatialReference(srcRst.GetProjection())
-    outLay = outVec.CreateLayer(outVecPath, srs)
-    # outFld = ogr.FieldDefn('FID', dataType) 
-    # outLay.CreateField(outFld)
-    gdal.Polygonize(srcBnd, srcBnd, outLay, fieldIndex, ['8CONNECTED=' + str(connectedness)], callback=None)
-    del srcRst, srcBnd, outVec, outLay

@@ -106,7 +106,8 @@ del files, file
 
 #%% COMPUTES VECTORS    
 
-files = search_files(paths['predictions'], pattern='label.*tif$')
+files  = search_files(paths['predictions'], pattern='label.*tif$')
+
 for file in files:
     print(path.basename(file))
     os.system('gdal_polygonize.py {} {} -q'.format(file, file.replace('tif', 'gpkg')))
@@ -144,4 +145,8 @@ args = dict(
 
 os.system('gdalbuildvrt -overwrite {vrtfile} {pattern}'.format(**args))
 os.system('gdalwarp -overwrite {vrtfile} {outfile} -t_srs EPSG:3035 -te 3210400 2166600 4191800 3134800 -tr 200 200 -r average -ot Float32'.format(**args))
+os.system('find {} -name "label*.tif" -type f -delete'.format(paths['predictions']))
 del args
+
+for file in search_files(paths['images'], pattern=legend_1900):
+    os.system('open {}'.format(file))
