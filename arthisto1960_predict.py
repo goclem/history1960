@@ -93,36 +93,10 @@ def display_history(history:dict, stats:list=['accuracy', 'loss']) -> None:
     pyplot.tight_layout(pad=2.0)
     pyplot.show()
 
-# Displays prediction statistics
-def display_statistics(image_test:np.ndarray, label_test:np.ndarray, proba_pred:np.ndarray, label_pred:np.ndarray) -> None:
-    # Format
-    image_test = (np.array(image_test) * 255).astype(int) # Tensor type
-    label_test = label_test.astype(bool)
-    label_pred = label_pred.astype(bool)
-    # Statistics
-    mask_tp = np.logical_and(label_test, label_pred)
-    mask_tn = np.logical_and(np.invert(label_test), np.invert(label_pred))
-    mask_fp = np.logical_and(np.invert(label_test), label_pred)
-    mask_fn = np.logical_and(label_test, np.invert(label_pred))
-    # Augmented images
-    colour  = (255, 255, 0)
-    images  = [np.where(np.tile(mask, (1, 1, 3)), colour, image_test) for mask in [mask_tp, mask_tn, mask_fp, mask_fn]]
-    # Figure
-    images = [image_test, label_test, proba_pred, label_pred] + images
-    titles = ['Test image', 'Test label', 'Predicted probability', 'Predicted label', 'True positive', 'True negative', 'False positive', 'False negative']
-    fig, axs = pyplot.subplots(2, 4, figsize=(20, 10))
-    for image, title, ax in zip(images, titles, axs.ravel()):
-        ax.imshow(image)
-        ax.set_title(title, fontsize=20)
-        ax.axis('off')
-    pyplot.tight_layout(pad=2.0)
-    pyplot.show()
-
 #%% PREPARES DATA
 
 # Training tiles
-pattern = identifiers(search_files(paths['labels'], 'tif$'))
-pattern = '({}).tif$'.format('|'.join(pattern))
+pattern = identifiers(search_files(paths['labels'], 'tif$'), regex=True)
 
 # Loads images as blocks (including shifted)
 images = search_files(directory=paths['images'], pattern=pattern)
@@ -281,15 +255,14 @@ def predict_tiles(model, files):
     probas1 = blocks_to_images(blocks=probas1, imagesize=images.shape[:3] + (1,), blocksize=(256, 256), shift=False)
     probas2 = blocks_to_images(blocks=probas2, imagesize=images.shape[:3] + (1,), blocksize=(256, 256), shift=True)
     probas  = (probas1 + probas2) / 2
-    del blocks1, blocks2, probas1, probas2
     return probas
 
 # Computes predictions
 for i, files in enumerate(batches):
-    print('Batch {:d}/{:d}'.format(i + 1, len(batches)))
+    print('Batch {i:d}/{n:d}'.format(i=i + 1, n=len(batches)))
     probas   = predict_tiles(model=model, files=files)
     outfiles = [path.join(paths['predictions'], path.basename(file).replace('image', 'proba')) for file in files]
     for proba, file, outfile in zip(probas, files, outfiles):
-        write_raster(array=proba, source=file, destination=outfile, nodata=-1, dtype='float32')
-    del probas, outfiles
+        write_raster(array=proba, source=file, destination=outfile, nodata=None, dtype='float32')
+del i, files, file, probas, proba, outfiles, outfile
 # %%

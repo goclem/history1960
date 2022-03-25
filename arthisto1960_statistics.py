@@ -4,18 +4,17 @@
 @description: Computes statistics statistics for the Arthisto 1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.03.21
+@version: 2022.03.23
 '''
 
 #%% HEADER
 
 # Modules
 import numpy as np
-import rasterio
 
 from arthisto1960_utilities import *
-# from skimage import morphology, segmentation
 from numpy import random
+from pandas import DataFrame
 from skimage import segmentation
 from os import path
 
@@ -36,27 +35,29 @@ legend_N    = '(0400_6570|0425_6570|0400_6595|0425_6595|0425_6545|0400_6545|0425
 
 #%% FUNCTIONS
 
-# Computes prediction masks
-def compute_masks(label:np.ndarray, pred:np.ndarray) -> None:
+# Computes prediction sets
+def compute_sets(label_test:np.ndarray, label_pred:np.ndarray) -> np.ndarray:
     # Formats labels
-    label = label.astype(bool)
-    pred  = pred.astype(bool)
+    label_test = label_test.astype(bool)
+    label_pred = label_pred.astype(bool)
     # Computes masks
-    mask_tp = np.logical_and(label, pred)
-    mask_tn = np.logical_and(np.invert(label), np.invert(pred))
-    mask_fp = np.logical_and(np.invert(label), pred)
-    mask_fn = np.logical_and(label, np.invert(pred))
-    masks   = np.array([mask_tp, mask_tn, mask_fp, mask_fn])
-    return masks
+    pixset_tp = np.logical_and(label_test, label_pred)
+    pixset_tn = np.logical_and(np.invert(label_test), np.invert(label_pred))
+    pixset_fp = np.logical_and(np.invert(label_test), label_pred)
+    pixset_fn = np.logical_and(label_test, np.invert(label_pred))
+    pixsets   = np.array([pixset_tp, pixset_tn, pixset_fp, pixset_fn])
+    return pixsets
+
+# Computes subset without borders
+def mask_borders(sets:np.ndarray, label_test:np.ndarray) -> np.ndarray:
+    subset = np.invert(segmentation.find_boundaries(label_test))
+    subset = np.tile(subset, (sets.shape[0], 1, 1, 1))
+    masked = np.where(subset, sets, False)
+    return masked 
 
 # Computes prediction statistics
-def compute_statistics(masks:np.ndarray, remove_border:np.ndarray=None):
-    # Computes subsets
-    subset = np.ones(masks.shape[1:], dtype=bool)
-    if remove_border is not None:
-        subset = np.invert(segmentation.find_boundaries(remove_border).astype(bool))
-    # Computes statistics
-    tp, tn, fp, fn = np.sum(masks, axis=(1, 2, 3))
+def compute_statistics(sets:np.ndarray):
+    tp, tn, fp, fn = np.sum(sets, axis=(1, 2, 3))
     with np.errstate(divide='ignore', invalid='ignore'): # Returns Inf when dividing by 0
         recall    = np.divide(tp, (tp + fn)) # Among the building pixels, {recall}% are classified as building
         precision = np.divide(tp, (tp + fp)) # Among the pixels classified as buildings, {precision}% are in fact buildings
@@ -65,14 +66,14 @@ def compute_statistics(masks:np.ndarray, remove_border:np.ndarray=None):
     return statistics
 
 # Displays prediction masks
-def display_statistics(image:np.ndarray, masks:np.ndarray, colour=(255, 255, 0)) -> None:
+def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) -> None:
         # Formats titles
-        counts = np.sum(masks, axis=(1, 2, 3))
+        counts = np.sum(sets, axis=(1, 2, 3))
         titles = ['True positive ({:d})', 'True negative ({:d})', 'False positive ({:d})', 'False negative ({:d})']
         titles = list(map(lambda title, count: title.format(count), titles, counts))
         # Formats images
         image  = (image * 255).astype(int)
-        images = [np.where(np.tile(mask, (1, 1, 3)), colour, image) for mask in masks]
+        images = [np.where(np.tile(mask, (1, 1, 3)), colour, image) for mask in sets]
         # Displays images
         fig, axs = pyplot.subplots(2, 2, figsize=(10, 10))
         for image, title, ax in zip(images, titles, axs.ravel()):
@@ -82,71 +83,99 @@ def display_statistics(image:np.ndarray, masks:np.ndarray, colour=(255, 255, 0))
         pyplot.tight_layout(pad=2.0)
         pyplot.show()
 
-#%% COPUMPUTES PREDICTION STATISTICS
-
-for data in ['images_test', 'labels_test', 'probas_pred', 'labels_pred']:
-    globals()[data] = np.load(path.join(paths['statistics'], data + '.npy'))
-
-# Displays prediction statistics
-for i in random.choice(range(len(images_test)), 5):
-    image, label, pred = [images_test[i], labels_test[i], labels_pred[i]]
-    masks = compute_masks(label=label, pred=pred)
-    display_statistics(image=image, masks=masks)
-    stats = compute_statistics(masks=masks, remove_border=label)
-    print('Recall: {recall:.4f}\nPrecision: {precision:.4f}\nAccuracy: {accuracy:.4f}'.format(**stats))
-del image, label, pred
-
 #%% COMPUTES LABELS
 
 files = search_files(paths['predictions'], pattern='proba.*tif$')
-for file in files:
-    print(path.basename(file))
-    os.system('gdal_calc.py --overwrite -A {} --outfile={} --calc="A>=0.5" --NoDataValue=0 --type=Byte --quiet'.format(file, file.replace('proba', 'label')))
-del files, file
+for i, file in enumerate(files):
+    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
+    os.system('gdal_calc.py --overwrite -A {proba} --outfile={label} --calc="A>=0.5" --NoDataValue=0 --type=Byte --quiet'.format(proba=file, label=file.replace('proba', 'label')))
+del files, i, file
+
+#%% COMPUTES PREDICTION STATISTICS
+
+# Loads data
+labels_test = np.load(path.join(paths['statistics'], 'labels_test.npy'))
+labels_pred = np.load(path.join(paths['statistics'], 'labels_pred.npy'))
+images_test = np.load(path.join(paths['statistics'], 'images_test.npy'))
+probas_pred = np.load(path.join(paths['statistics'], 'probas_pred.npy'))
+
+# Subsets tiles where there are labels
+subset = np.logical_and(
+    np.sum(labels_test, axis=(1, 2, 3)) > 0, 
+    np.sum(labels_pred, axis=(1, 2, 3)) > 0)
+
+labels_test = labels_test[subset]
+labels_pred = labels_pred[subset]
+images_test = images_test[subset]
+probas_pred = probas_pred[subset]
+del subset
+
+# Compute sets and removes border
+pixsets = np.array(list(map(compute_sets, labels_test, labels_pred)))
+pixsets = np.array(list(map(mask_borders, pixsets, labels_test)))
+
+# Aggregated statistics
+stats = np.sum(pixsets, axis=0) # Or np.add.reduce(pixsets)
+stats = compute_statistics(stats)
+
+# Statistics per tile
+stats = list(map(compute_statistics, pixsets))
+stats = DataFrame.from_dict(stats)
+
+# Display statistics
+subset = stats.sort_values(by='precision', ascending=True).index[:5]
+for image, pixset in zip(images_test[subset], pixsets[subset]):
+    display_statistics(image, pixset)
+del subset
 
 #%% COMPUTES VECTORS    
 
-files  = search_files(paths['predictions'], pattern='label.*tif$')
-
-for file in files:
-    print(path.basename(file))
-    os.system('gdal_polygonize.py {} {} -q'.format(file, file.replace('tif', 'gpkg')))
-del files, file
+files = search_files(paths['predictions'], pattern='label.*tif$')
+for i, file in enumerate(files):
+    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
+    os.system('gdal_polygonize.py {raster} {vector} -q'.format(raster=file, vector=file.replace('tif', 'gpkg')))
+del files, i, file
 
 #%% AGGREGATES VECTORS
 
 args = dict(
     pattern=path.join(paths['predictions'], '*.gpkg'),
-    outfile=path.join(paths['data'], 'building1960.gpkg')
+    outfile=path.join(paths['data'], 'buildings1960.gpkg')
 )
 os.system('ogrmerge.py -single -overwrite_ds -f GPKG -o {outfile} {pattern}'.format(**args))
-os.system('find {} -name "*.gpkg" -type f -delete'.format(paths['predictions']))
+os.system('find {directory} -name "*.gpkg" -type f -delete'.format(directory=paths['predictions']))
 del args
 
 #%% AGGREGATES RASTERS
 
 # Removes no data values for aggregation
 files = search_files(paths['predictions'], pattern='label.*tif$')
-for file in files:
-    print(path.basename(file))
-    os.system('gdal_edit.py -unsetnodata {}'.format(file))
-del files, file
+for i, file in enumerate(files):
+    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
+    os.system('gdal_edit.py -unsetnodata {raster}'.format(raster=file))
+    # os.system('gdal_edit.py -a_nodata 0 {raster}'.format(raster=file)) # Sets nodata to 0
+del files, i, file
 
 # Extracts extent
 # reference = rasterio.open('../data_project/ca.tif')
 # reference.bounds
+# reference.nodatavals
 # del reference
 
 args = dict(
     pattern = path.join(paths['predictions'], 'label*.tif'),
-    vrtfile = path.join(paths['data'], 'building1960.vrt'),
-    outfile = path.join(paths['data'], 'building1960.tif')
+    vrtfile = path.join(paths['data'], 'buildings1960.vrt'),
+    outfile = path.join(paths['data'], 'buildings1960.tif'),
+    reffile = '../data_project/ca.tif'
 )
 
 os.system('gdalbuildvrt -overwrite {vrtfile} {pattern}'.format(**args))
 os.system('gdalwarp -overwrite {vrtfile} {outfile} -t_srs EPSG:3035 -te 3210400 2166600 4191800 3134800 -tr 200 200 -r average -ot Float32'.format(**args))
-os.system('find {} -name "label*.tif" -type f -delete'.format(paths['predictions']))
+os.remove(args['vrtfile'])
+# os.system('find {directory} -name "label*.tif" -type f -delete'.format(directory=paths['predictions']))
 del args
 
-for file in search_files(paths['images'], pattern=legend_1900):
+for file in search_files(paths['predictions'], pattern=f'proba_{training}'):
     os.system('open {}'.format(file))
+
+os.system('gdal_calc.py --overwrite -A {outfile} -B {reffile} --outfile={outfile} --calc="(A*(B!=0))-(B==0)" --NoDataValue=-1 --type=Float32 --quiet'.format(**args))

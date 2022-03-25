@@ -32,12 +32,12 @@ def search_files(directory:str, pattern:str='.') -> list:
     return files
 
 # Extracts file identifiers
-def identifiers(files:list, regex:bool=False) -> list:
+def identifiers(files:list, regex:bool=False, extension:str='tif') -> list:
     identifiers = [os.path.splitext(os.path.basename(file))[0] for file in files]
     identifiers = [identifier[identifier.find('_') + 1:] for identifier in identifiers]
     identifiers.sort()
     if regex:
-        identifiers = '({})'.format('|'.join(identifiers))
+        identifiers = '({identifiers})\\.{extension}$'.format(identifiers='|'.join(identifiers), extension=extension)
     return identifiers
 
 # Filters by identifiers
