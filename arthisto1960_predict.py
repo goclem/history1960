@@ -11,6 +11,7 @@
 
 # Modules
 import itertools
+from matplotlib.pyplot import legend
 import numpy as np
 import tensorflow
 
@@ -172,7 +173,7 @@ del augmentation, data_generator, images_generator, labels_generator, images_tra
 # Initialises model
 model = binary_unet(input_shape=(256, 256, 3), filters=32)
 model.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['accuracy', 'Recall', 'Precision'])
-# model = models.load_model('../data_1960/models/unet32_epoch012.h5')
+# model = models.load_model('../data_1960/models/unet32_baseline.h5')
 
 # Summary
 # model.summary()
@@ -210,7 +211,7 @@ training = model.fit(
 #%% EVALUATES MODEL
 
 # Loads model if estimated previously
-# unet = models.load_model('../data_1960/models/unet32_baseline.h5')
+# model = models.load_model('../data_1960/models/unet32_baseline.h5')
 
 # Compute statistics
 # performance = unet.evaluate(images_test, labels_test)
@@ -226,9 +227,9 @@ for data in ['images_test', 'labels_test', 'probas_pred', 'labels_pred']:
     np.save(path.join(paths['statistics'], data + '.npy'), globals()[data])
 
 # Displays prediction statistics
-for i in random.choice(range(len(images_test)), 5):
-    display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_pred=probas_pred[i], label_pred=labels_pred[i])
-del images_test, labels_test, probas_pred, labels_pred
+# for i in random.choice(range(len(images_test)), 5):
+#     display_statistics(image_test=images_test[i], label_test=labels_test[i], proba_pred=probas_pred[i], label_pred=labels_pred[i])
+# del images_test, labels_test, probas_pred, labels_pred
 
 #%% PREDICTS NEW TILES
 
@@ -240,7 +241,7 @@ model = models.load_model('../data_1960/models/unet32_baseline.h5')
 # Lists batches
 batch_size = 3
 batches = search_files(paths['images'], pattern='tif$')
-batches = filter_identifiers(batches, search_files(paths['predictions'], pattern='tif$'))
+#batches = filter_identifiers(batches, search_files(paths['predictions'], pattern='tif$'))
 batches = [batches[i:i + batch_size] for i in range(0, len(batches), batch_size)]
 del batch_size
 
