@@ -98,39 +98,3 @@ def write_raster(array:np.ndarray, source:str, destination:str, nodata:int=0, dt
     with rasterio.open(fp=destination, mode='w', **profile) as dest:
         dest.write(raster)
         dest.close()
-
-# Converts vector to raster
-def rasterise(srcVecPath:str, srcRstPath:str, outRstPath:str, driver:str='GTiff', burnField:str=None, burnValue:int=1, noDataValue:int=0, dataType:int=gdal.GDT_Byte):
-    '''
-    Description:
-        Converts a vector file to a raster file
-    
-    Parameters:
-        srcVecPath  (str): Path to source vector file 
-        srcRstPath  (str): Path to source raster file
-        outRstPath  (str): Path to output raster file
-        driver      (str): GDAL driver
-        burnField   (str): Field to burn (overrides burnValue)
-        burnValue   (int): Fixed value to burn
-        noDataValue (int): Missing value in raster
-        dataType    (int): GDAL data type
-        
-    Returns:
-        Rasterised vector file in raster format
-    '''
-    # import gdal, ogr
-    srcRst = gdal.Open(srcRstPath, gdal.GA_ReadOnly)
-    srcVec = ogr.Open(srcVecPath)
-    srcLay = srcVec.GetLayer()
-    rstDrv = gdal.GetDriverByName('GTiff')
-    outRst = rstDrv.Create(outRstPath, srcRst.RasterXSize, srcRst.RasterYSize, 1, dataType)
-    outRst.SetGeoTransform(srcRst.GetGeoTransform())
-    outRst.SetProjection(srcRst.GetProjection())
-    outBnd = outRst.GetRasterBand(1)
-    outBnd.Fill(noDataValue)
-    outBnd.SetNoDataValue(noDataValue)
-    if burnField is not None:
-        gdal.RasterizeLayer(outRst, [1], srcLay, options = ['ATTRIBUTE=' + burnField])
-    else:
-        gdal.RasterizeLayer(outRst, [1], srcLay, burn_values = [burnValue])
-    outRst = None

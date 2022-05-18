@@ -32,6 +32,7 @@ paths = dict(
 training    = '(0250_6745|0350_6695|0400_6445|0550_6295|0575_6295|0650_6870|0700_6520|0700_6545|0700_7070|0875_6245|0875_6270|0900_6245|0900_6270|0900_6470|1025_6320).tif$'
 legend_1900 = '(0600_6895|0625_6895|0600_6870|0625_6870|0625_6845|0600_6845|0650_6895|0650_6870|0650_6845|0675_6895|0675_6870|0675_6845|0850_6545|0825_6545|0850_6520|0825_6520|0825_6495).tif$'
 legend_N    = '(0400_6570|0425_6570|0400_6595|0425_6595|0425_6545|0400_6545|0425_6520|0400_6520|0425_6395|0425_6420|0400_6395|0400_6420|0425_6720|0450_6720|0425_6745|0450_6745|0450_6695|0425_6695|0425_6670|0450_6670|0450_6570|0450_6595|0450_6545|0450_6520|0450_6945|0450_6920|0475_6920|0475_6795|0500_6795|0475_6770|0500_6770|0500_6720|0475_6720|0475_6695|0500_6695|0475_6670|0450_6645|0475_6645|0500_6645|0525_6670|0500_6670|0525_6645|0500_6620|0525_6620|0475_6620|0550_6820|0525_6820|0550_6895|0575_6895|0550_6870|0575_6870|0575_6845|0550_6845|0550_6670|0575_6670|0550_6695|0575_6695|0575_6645|0550_6645|0475_6495|0450_6495|0475_6470|0450_6470|0450_6420|0450_6395|0475_6420|0475_6395|0475_6320|0500_6320|0525_6495|0500_6495|0500_6520|0525_6520|0525_6320|0525_6345|0500_6345|0600_6670|0600_6695|0600_6645|0625_6495|0650_6495|0650_6520|0625_6520|0725_6320|0700_6320|0725_6345|0700_6345|0775_6420|0750_6420|0725_6420|0775_6445|0750_6445|0725_6445|0775_6395|0725_6395|0750_6395|0775_6370|0800_6370|0775_6345|0800_6345|1150_6170|1150_6145|1150_6120|1175_6195|1150_6195|1175_6170|1175_6145|1175_6120|1175_6095|1150_6095|1200_6095|1175_6070|1200_6070|1200_6220|1200_6195|1175_6220|1200_6170|1200_6145|1225_6170|1225_6145|1200_6120|1225_6120|1225_6095|1250_6120|1250_6145).tif$'
+cities      = dict(paris='0625_6870|0650_6870', marseille='0875_6245|0875_6270', lyon='0825_6520|0825_6545', toulouse='0550_6295|0575_6295')
 
 #%% FUNCTIONS
 
@@ -62,7 +63,7 @@ def compute_statistics(sets:np.ndarray):
         recall    = np.divide(tp, (tp + fn)) # Among the building pixels, {recall}% are classified as building
         precision = np.divide(tp, (tp + fp)) # Among the pixels classified as buildings, {precision}% are in fact buildings
         accuracy  = np.divide((tp + tn), (tp + tn + fp + fn))
-    statistics = dict(recall=recall, precision=precision, accuracy=accuracy)
+    statistics = dict(tp=tp, tn=tn, fp=fp, fn=fn, recall=recall, precision=precision, accuracy=accuracy)
     return statistics
 
 # Displays prediction masks
@@ -117,7 +118,7 @@ pixsets = np.array(list(map(compute_sets, labels_test, labels_pred)))
 pixsets = np.array(list(map(mask_borders, pixsets, labels_test)))
 
 # Aggregated statistics
-stats = np.sum(pixsets, axis=0) # Or np.add.reduce(pixsets)
+stats = np.sum(pixsets, axis=0)
 stats = compute_statistics(stats)
 
 # Statistics per tile
@@ -125,24 +126,29 @@ stats = list(map(compute_statistics, pixsets))
 stats = DataFrame.from_dict(stats)
 
 # Display statistics
-subset = stats.sort_values(by='precision', ascending=True).index[:5]
+stats.hist(['precision', 'recall'], bins=25)
+subset = stats.sort_values(by='fn', ascending=False).index[:10]
 for image, pixset in zip(images_test[subset], pixsets[subset]):
     display_statistics(image, pixset)
 del subset
 
 #%% COMPUTES VECTORS    
 
-files = search_files(paths['predictions'], pattern='label.*tif$')
+pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
+files   = search_files(paths['predictions'], pattern=f'label_{pattern}')
+
+# Computes vectors
 for i, file in enumerate(files):
-    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
+    print('{file} ({index:01d}/{total:01d})'.format(file=path.basename(file), index=i + 1, total=len(files)))
+    os.system('gdal_edit.py -a_nodata 0 {raster}'.format(raster=file))
     os.system('gdal_polygonize.py {raster} {vector} -q'.format(raster=file, vector=file.replace('tif', 'gpkg')))
-del files, i, file
+    os.system('gdal_edit.py -unsetnodata {raster}'.format(raster=file))
+del files, file, i
 
-#%% AGGREGATES VECTORS
-
+# Aggregates vectors
 args = dict(
     pattern=path.join(paths['predictions'], '*.gpkg'),
-    outfile=path.join(paths['data'], 'buildings1960.gpkg')
+    outfile=path.join(paths['data'], 'cities1960.gpkg')
 )
 os.system('ogrmerge.py -single -overwrite_ds -f GPKG -o {outfile} {pattern}'.format(**args))
 os.system('find {directory} -name "*.gpkg" -type f -delete'.format(directory=paths['predictions']))
@@ -181,5 +187,10 @@ os.system('gdal_calc.py --overwrite -A {outfile} -B {reffile} --outfile={outfile
 del args
 
 #%% Display results
-for file in search_files(paths['predictions'], pattern=f'proba_{training}'):
+pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
+
+for file in search_files(paths['images'], pattern=f'image_{pattern}'):
+    os.system('open {}'.format(file))
+
+for file in search_files(paths['predictions'], pattern=f'label_{pattern}'):
     os.system('open {}'.format(file))

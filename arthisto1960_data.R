@@ -21,7 +21,7 @@ st_write(maps, "tiles/maps_1960.gpkg", quiet = T, delete_dsn = T)
 
 # tiles <- st_read("tiles/tiles_1950.shp", quiet = T) # From raw data
 tiles <- st_set_crs(tiles, 2154)
-tiles <- setNames(tiles, c("tileid", "geometry"))
+tiles <- setNames(tiles, c("tile", "geometry"))
 tiles <- mutate(tiles, id = str_replace(id, "SC50_HISTO1950", "sc50"))
 tiles <- mutate(tiles, id = str_remove(id, "_L93"))
 st_write(tiles, "tiles/tiles_1960.gpkg", quiet = T, delete_dsn = T)
@@ -39,3 +39,9 @@ legends <- mutate(legends, ledgendid = ifelse(legend == "M"    & ncolours == 5, 
 legends <- mutate(legends, ledgendid = ifelse(legend == "M"    & ncolours == 1, 4, ledgendid))
 legends <- mutate(legends, ledgendid = ifelse(legend == "N"    & ncolours == 1, 5, ledgendid))
 st_write(legends, "tiles/legends_1960.gpkg", quiet = T, delete_dsn = T)
+
+# Computes training tiles -------------------------------------------------
+
+training <- st_read("tiles/tiles_1960.gpkg", quiet = T)
+training <- filter(training, tile %in% c("0350_6695", "0400_6445", "0450_6920", "0550_6295", "0575_6295", "0600_6770", "0650_6870", "0700_6520", "0700_6545", "0700_7070", "0875_6270", "0900_6245", "0900_6270", "0900_6470", "1025_6320"))
+jorda
