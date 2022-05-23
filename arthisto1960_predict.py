@@ -20,7 +20,7 @@ from arthisto1960_utilities import *
 from numpy import random
 from pandas import DataFrame
 from os import path
-from tensorflow.keras import callbacks, layers, models, preprocessing, utils
+from keras import callbacks, layers, models, preprocessing, utils
 
 # TensorFlow
 print('TensorFlow version:', tensorflow.__version__)

@@ -22,7 +22,7 @@ from rasterio import features
 
 #%% FILES UTILITIES
 
-def search_data(pattern:str='.*', directory:str='../data') -> list:
+def search_data(pattern:str='.*', directory:str='../data_1960') -> list:
     '''Sorted list of files in a directory matching a regular expression'''
     files = list()
     for root, _, file_names in os.walk(directory):
