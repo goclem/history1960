@@ -55,3 +55,9 @@ def binary_unet(input_shape, filters):
     # Model
     model = models.Model(inputs=inputs, outputs=outputs, name='U-Net')
     return model
+
+# Displays structure
+# summary = DataFrame([dict(Name=layer.name, Type=layer.__class__.__name__, Shape=layer.output_shape, Params=layer.count_params()) for layer in binary_unet.layers])
+# summary.style.to_html(path.join(paths['models'], 'unet64_structure.html'), index=False) 
+# del summary
+# tensorflow.keras.utils.plot_model(binary_unet, to_file=path.join(paths['models'], 'unet64_structure.pdf'), show_shapes=True)

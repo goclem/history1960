@@ -4,7 +4,7 @@
 @description: Prepares data for the Arthisto1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.03.18
+@version: 2022.05.23
 '''
 
 #%% MODULES
@@ -20,8 +20,7 @@ paths = dict(
 
 #%% FORMATS IMAGES
 
-srcfiles = search_files(paths['images_raw'], 'tif$')
-
+srcfiles = search_data(paths['images_raw'], 'tif$')
 for srcfile in srcfiles:
     print(path.basename(srcfile))
     outfile = path.basename(srcfile).replace('sc50', 'image')
@@ -32,15 +31,14 @@ for srcfile in srcfiles:
 #%% FORMATS LABELS
 
 # Builds file paths
-srclabels = search_files(directory=paths['labels_raw'], pattern='label_\\d{4}_\\d{4}\\.gpkg$')
-srclabels = list(filter(re.compile('^(?!.*(incomplete|pending)).*').search, srclabels)) # Drops incomplete tiles
-srcimages = search_files(directory=paths['labels_raw'], pattern=identifiers(srclabels, regex=True) + '.tif')
+srclabels = search_data(paths['labels_raw'], 'label_\\d{4}_\\d{4}\\.gpkg$')
+srclabels = list(filter(re.compile('^(?!.*(incomplete|pending)).*').search, srclabels))
+srcimages = search_data(paths['labels_raw'], identifiers(srclabels, regex=True))
 outlabels = [path.join(paths['labels'], path.basename(file).replace('.gpkg', '.tif')) for file in srclabels]
 
 # Rasterises label vectors
 for srclabel, srcimage, outlabel in zip(srclabels, srcimages, outlabels):
-    rasterise(srcVecPath=srclabel, srcRstPath=srcimage, outRstPath=outlabel, burnValue=1)
+    label = rasterise(srclabel, srcimage)
+    write_raster(label, srcimage, outlabel)
 del srclabels, srcimages, outlabels
 
-training = search_files(directory=paths['labels_raw'], pattern='label_\\d{4}_\\d{4}\\.gpkg$')
-identifiers(srclabels, regex=True)
