@@ -135,7 +135,7 @@ del train_callbacks
 #%% EVALUATES MODEL
 
 # Loads model
-model = models.load_model(path.join(paths['models'], 'unet64_old.h5'))
+model = models.load_model(path.join(paths['models'], 'unet64_baseline.h5'))
 
 # Compute statistics
 performance = layers.Rescaling(1./255)(images_test)
