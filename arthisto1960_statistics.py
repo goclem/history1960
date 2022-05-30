@@ -13,20 +13,10 @@
 import numpy as np
 
 from arthisto1960_utilities import *
-from numpy import random
+from keras import layers, models
+from os import path
 from pandas import DataFrame
 from skimage import segmentation
-from os import path
-
-# Paths
-paths = dict(
-    data='../data_1960',
-    images='../data_1960/images',
-    labels='../data_1960/labels',
-    models='../data_1960/models',
-    predictions='../data_1960/predictions',
-    statistics='../data_1960/statistics'
-)
 
 # Samples
 training    = '(0250_6745|0350_6695|0400_6445|0550_6295|0575_6295|0650_6870|0700_6520|0700_6545|0700_7070|0875_6245|0875_6270|0900_6245|0900_6270|0900_6470|1025_6320).tif$'
@@ -73,7 +63,6 @@ def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) 
         titles = ['True positive ({:d})', 'True negative ({:d})', 'False positive ({:d})', 'False negative ({:d})']
         titles = list(map(lambda title, count: title.format(count), titles, counts))
         # Formats images
-        image  = (image * 255).astype(int)
         images = [np.where(np.tile(mask, (1, 1, 3)), colour, image) for mask in sets]
         # Displays images
         fig, axs = pyplot.subplots(2, 2, figsize=(10, 10))
@@ -84,34 +73,25 @@ def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) 
         pyplot.tight_layout(pad=2.0)
         pyplot.show()
 
-#%% COMPUTES LABELS
-
-files = search_files(paths['predictions'], pattern='proba.*tif$')
-for i, file in enumerate(files):
-    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
-    os.system('gdal_calc.py --overwrite -A {proba} --outfile={label} --calc="A>=0.5" --NoDataValue=0 --type=Byte --quiet'.format(proba=file, label=file.replace('proba', 'label')))
-del files, i, file
-
 #%% COMPUTES PREDICTION STATISTICS
 
 # Use sklearn.metrics.classification_report
 
-# Loads data
+# Loads model and test data
 labels_test = np.load(path.join(paths['statistics'], 'labels_test.npy'))
-labels_pred = np.load(path.join(paths['statistics'], 'labels_pred.npy'))
 images_test = np.load(path.join(paths['statistics'], 'images_test.npy'))
-probas_pred = np.load(path.join(paths['statistics'], 'probas_pred.npy'))
+model       = models.load_model(path.join(paths['models'], 'unet64_baseline.h5'))
 
-# Subsets tiles where there are labels
-subset = np.logical_and(
-    np.sum(labels_test, axis=(1, 2, 3)) > 0, 
-    np.sum(labels_pred, axis=(1, 2, 3)) > 0)
-
-labels_test = labels_test[subset]
-labels_pred = labels_pred[subset]
+# Subsets data
+subset = np.sum(labels_test, axis=(1, 2, 3)) > 0
 images_test = images_test[subset]
-probas_pred = probas_pred[subset]
+labels_test = labels_test[subset]
 del subset
+
+# Predicts test data
+probas_pred = layers.Rescaling(1./255)(images_test)
+probas_pred = model.predict(probas_pred)
+labels_pred = probas_pred >= 0.5
 
 # Compute sets and removes border
 pixsets = np.array(list(map(compute_sets, labels_test, labels_pred)))
@@ -131,66 +111,3 @@ subset = stats.sort_values(by='fn', ascending=False).index[:10]
 for image, pixset in zip(images_test[subset], pixsets[subset]):
     display_statistics(image, pixset)
 del subset
-
-#%% COMPUTES VECTORS    
-
-pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
-files   = search_files(paths['predictions'], pattern=f'label_{pattern}')
-
-# Computes vectors
-for i, file in enumerate(files):
-    print('{file} ({index:01d}/{total:01d})'.format(file=path.basename(file), index=i + 1, total=len(files)))
-    os.system('gdal_edit.py -a_nodata 0 {raster}'.format(raster=file))
-    os.system('gdal_polygonize.py {raster} {vector} -q'.format(raster=file, vector=file.replace('tif', 'gpkg')))
-    os.system('gdal_edit.py -unsetnodata {raster}'.format(raster=file))
-del files, file, i
-
-# Aggregates vectors
-args = dict(
-    pattern=path.join(paths['predictions'], '*.gpkg'),
-    outfile=path.join(paths['data'], 'cities1960.gpkg')
-)
-os.system('ogrmerge.py -single -overwrite_ds -f GPKG -o {outfile} {pattern}'.format(**args))
-os.system('find {directory} -name "*.gpkg" -type f -delete'.format(directory=paths['predictions']))
-del args
-
-#%% AGGREGATES RASTERS
-
-# Removes no data values for aggregation
-files = search_files(paths['predictions'], pattern='label.*tif$')
-for i, file in enumerate(files):
-    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
-    os.system('gdal_edit.py -unsetnodata {raster}'.format(raster=file))
-    # os.system('gdal_edit.py -a_nodata 0 {raster}'.format(raster=file)) # Sets nodata to 0
-del files, i, file
-
-# Extracts extent
-# reference = rasterio.open('../data_project/ca.tif')
-# reference.bounds
-# reference.nodatavals
-# del reference
-
-args = dict(
-    pattern = path.join(paths['predictions'], 'label*.tif'),
-    vrtfile = path.join(paths['data'], 'buildings1960.vrt'),
-    outfile = path.join(paths['data'], 'buildings1960.tif'),
-    reffile = '../data_project/ca.tif'
-)
-
-os.system('gdalbuildvrt -overwrite {vrtfile} {pattern}'.format(**args))
-os.system('gdalwarp -overwrite {vrtfile} {outfile} -t_srs EPSG:3035 -te 3210400 2166600 4191800 3134800 -tr 200 200 -r average -ot Float32'.format(**args))
-os.remove(args['vrtfile'])
-# os.system('find {directory} -name "label*.tif" -type f -delete'.format(directory=paths['predictions']))
-
-# Masks non-buildable
-os.system('gdal_calc.py --overwrite -A {outfile} -B {reffile} --outfile={outfile} --calc="(A*(B!=0))-(B==0)" --NoDataValue=-1 --type=Float32 --quiet'.format(**args))
-del args
-
-#%% Display results
-pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
-
-for file in search_files(paths['images'], pattern=f'image_{pattern}'):
-    os.system('open {}'.format(file))
-
-for file in search_files(paths['predictions'], pattern=f'label_{pattern}'):
-    os.system('open {}'.format(file))
