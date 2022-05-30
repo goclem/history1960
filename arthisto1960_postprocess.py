@@ -28,7 +28,9 @@ for i, file in enumerate(files):
     os.system('gdal_calc.py --overwrite -A {proba} --outfile={label} --calc="A>=0.9" --type=Byte --quiet'.format(proba=file, label=file.replace('proba', 'label')))
 del files, i, file
 
-# ! MORPHOLOGY
+#%% MORPHOLOGY
+
+# ! IN PROGRESS
 file  = search_data(paths['predictions'], pattern=f'label_0650_6870.tif')[0]
 label = read_raster(file, dtype=bool)
 test  = np.squeeze(label)
@@ -39,7 +41,7 @@ test  = np.expand_dims(test, 2)
 diff  = test != label
 write_raster(test, file, '/Users/clementgorin/Desktop/test.tif', nodata=0)
 write_raster(diff, file, '/Users/clementgorin/Desktop/diff.tif', nodata=0)
-# ! MORPHOLOGY
+# ! IN PROGRESS
 
 #%% COMPUTES VECTORS    
 
