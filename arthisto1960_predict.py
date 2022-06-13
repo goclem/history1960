@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-@description: Performs predictions for the Arthisto 1960 project
+@description: Predictions for the Arthisto 1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.05.30
 '''
 
 #%% HEADER

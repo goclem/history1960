@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-@description: Initialises model for the Arthisto 1960 project
+@description: Model structures for the Arthisto 1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.03.24
 '''
 
 # Modules
-from tensorflow.keras import callbacks, layers, models, utils
+from keras import callbacks, layers, models, utils
 
 # Convolution block
 def convolution_block(input, filters:int, dropout:float=0, name:str=''):

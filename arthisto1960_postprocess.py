@@ -4,7 +4,6 @@
 @description: Post-processing for the Arthisto1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.05.30
 '''
 
 #%% HEADER

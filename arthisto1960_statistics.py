@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
-@description: Computes statistics statistics for the Arthisto 1960 project
+@description: Statistics for the Arthisto 1960 project
 @author: Clement Gorin
 @contact: gorinclem@gmail.com
-@version: 2022.05.30
 '''
 
 #%% HEADER
