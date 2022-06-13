@@ -8,6 +8,8 @@
 '''
 
 #%% MODULES
+import geopandas
+
 from arthisto1960_utilities import *
 from os import path
 
@@ -38,7 +40,9 @@ outlabels = [path.join(paths['labels'], path.basename(file).replace('.gpkg', '.t
 
 # Rasterises label vectors
 for srclabel, srcimage, outlabel in zip(srclabels, srcimages, outlabels):
+    print(path.basename(outlabel))
     label = rasterise(srclabel, srcimage)
     write_raster(label, srcimage, outlabel)
 del srclabels, srcimages, outlabels
+
 

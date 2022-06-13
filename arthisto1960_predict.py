@@ -10,6 +10,7 @@
 #%% HEADER
 
 # Modules
+import gc
 import numpy as np
 import tensorflow
 
@@ -40,6 +41,7 @@ def predict_tiles(model, files):
     probas1 = blocks_to_images(probas1, imagesize=images.shape[:3] + (1,), shift=False)
     probas2 = blocks_to_images(probas2, imagesize=images.shape[:3] + (1,), shift=True)
     probas  = (probas1 + probas2) / 2
+    gc.collect()
     return probas
 
 #%% PREDICTS NEW TILES
@@ -50,6 +52,7 @@ model = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
 # Lists batches
 batch_size = 3
 batches = search_data(paths['images'], pattern=training)
+batches = search_data(paths['images'], pattern='(0875_6245|0875_6270)\\.tif$')
 batches = filter_identifiers(batches, search_data(paths['predictions'], pattern='tif$'))
 batches = [batches[i:i + batch_size] for i in range(0, len(batches), batch_size)]
 del batch_size

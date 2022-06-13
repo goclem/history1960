@@ -111,7 +111,7 @@ stats.hist(['precision', 'recall'], bins=100, ax=fig.gca())
 del fig
 
 # Displays image statistics
-subset = stats.sort_values(by='fp', ascending=False).index[:10]
+subset = stats.sort_values(by='fn', ascending=False).index[:10]
 for image, set in zip(images_test[subset], sets[subset]):
     display_statistics(image, set)
 del subset
