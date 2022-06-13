@@ -64,3 +64,20 @@ for i, files in enumerate(batches):
         write_raster(array=proba, profile=file, destination=outfile, nodata=None, dtype='float32')
 del i, files, file, probas, proba, outfiles, outfile
 # %%
+
+# ! Debug
+
+# Issue 0825_6545
+files = search_data(paths['predictions'], pattern='proba_(0825_6545|0825_6520|0825_6495).tif$')
+np.any(np.isnan(read_raster(files[2])))
+
+files  = search_data(paths['predictions'], pattern='tif$')
+issues = [None] * len(files)
+for i, files in enumerate(batches):
+    print('Batch {i:d}/{n:d}'.format(i=i + 1, n=len(files)))
+    issue = np.any(np.isnan(read_raster(file)))
+    issues.append(issue)
+    print(issue)
+
+
+
