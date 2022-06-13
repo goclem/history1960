@@ -13,48 +13,33 @@
 import numpy as np
 
 from arthisto1960_utilities import *
-from skimage import morphology
+from skimage import morphology, segmentation
 from os import path
 
 # Samples
-training = '(0250_6745|0350_6695|0400_6445|0550_6295|0575_6295|0650_6870|0700_6520|0700_6545|0700_7070|0875_6245|0875_6270|0900_6245|0900_6270|0900_6470|1025_6320).tif$'
+training = identifiers(search_data(paths['labels']), regex = True)
 cities   = dict(paris='0625_6870|0650_6870', marseille='0875_6245|0875_6270', lyon='0825_6520|0825_6545', toulouse='0550_6295|0575_6295')
 
 #%% COMPUTES LABELS
 
 files = search_data(paths['predictions'], pattern='proba.*tif$')
 for i, file in enumerate(files):
-    print('{file} ({index:04d}/1023)'.format(file=path.basename(file), index=i + 1))
-    os.system('gdal_calc.py --overwrite -A {proba} --outfile={label} --calc="A>=0.9" --type=Byte --quiet'.format(proba=file, label=file.replace('proba', 'label')))
+    print('{file} ({index:04d}/{total:04d})'.format(file=path.basename(file), index=i + 1, total=len(files)))
+    os.system('gdal_calc.py --overwrite -A {proba} --outfile={label} --calc="A>=0.5" --type=Byte --quiet'.format(proba=file, label=file.replace('proba', 'label')))
 del files, i, file
-
-#%% MORPHOLOGY
-
-# ! IN PROGRESS
-file  = search_data(paths['predictions'], pattern=f'label_0650_6870.tif')[0]
-label = read_raster(file, dtype=bool)
-test  = np.squeeze(label)
-test  = morphology.opening(test, morphology.disk(2))
-test  = np.expand_dims(test, 2)
-# test  = morphology.remove_small_holes(label, 25)
-# test  = morphology.remove_small_objects(test, 5)
-diff  = test != label
-write_raster(test, file, '/Users/clementgorin/Desktop/test.tif', nodata=0)
-write_raster(diff, file, '/Users/clementgorin/Desktop/diff.tif', nodata=0)
-# ! IN PROGRESS
 
 #%% COMPUTES VECTORS    
 
-pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
-files   = search_data(paths['predictions'], pattern=f'label_{pattern}')
+# pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
+files = search_data(paths['predictions'], pattern=f'label_{training}')
 
 # Computes vectors
 for i, file in enumerate(files):
-    print('{file} ({index:01d}/{total:01d})'.format(file=path.basename(file), index=i + 1, total=len(files)))
+    print('{file} ({index:02d}/{total:02d})'.format(file=path.basename(file), index=i + 1, total=len(files)))
     os.system('gdal_edit.py -a_nodata 0 {raster}'.format(raster=file))
     os.system('gdal_polygonize.py {raster} {vector} -q'.format(raster=file, vector=file.replace('tif', 'gpkg')))
     os.system('gdal_edit.py -unsetnodata {raster}'.format(raster=file))
-del pattern, files, i, file
+del files, i, file
 
 # Aggregates vectors
 args = dict(
@@ -98,6 +83,7 @@ os.system('gdal_calc.py --overwrite -A {outfile} -B {reffile} --outfile={outfile
 del args
 
 #%% Display results
-pattern = '({ids}).tif'.format(ids='|'.join(cities.values()))
-[os.system('open {}'.format(file)) for file in search_data(paths['images'], pattern=f'image_{pattern}')]
-[os.system('open {}'.format(file)) for file in search_data(paths['predictions'], pattern=f'label_{pattern}')]
+pattern = '({ids}).tif$'.format(ids='|'.join(cities.values()))
+[os.system('open {}'.format(file)) for file in search_data(paths['images'], pattern=f'image_{training}')]
+[os.system('open {}'.format(file)) for file in search_data(paths['predictions'], pattern=f'label_{training}')]
+

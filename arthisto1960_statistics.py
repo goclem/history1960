@@ -19,8 +19,8 @@ from pandas import DataFrame
 from skimage import segmentation
 
 # Samples
-training ='(0250_6745|0350_6695|0400_6445|0550_6295|0575_6295|0650_6870|0700_6520|0700_6545|0700_7070|0825_6520|0875_6245|0875_6270|0900_6245|0900_6270|0900_6470|1025_6320).tif$'
 cities   = dict(paris='0625_6870|0650_6870', marseille='0875_6245|0875_6270', lyon='0825_6520|0825_6545', toulouse='0550_6295|0575_6295')
+training = identifiers(search_data(paths['labels']), regex = True)
 
 #%% FUNCTIONS
 
@@ -71,7 +71,7 @@ def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) 
 # Loads model and test data
 labels_test = np.load(path.join(paths['statistics'], 'labels_test.npy'))
 images_test = np.load(path.join(paths['statistics'], 'images_test.npy'))
-model       = models.load_model(path.join(paths['models'], 'unet64_baseline.h5'))
+model       = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
 
 # Predicts test data
 probas_pred = layers.Rescaling(1./255)(images_test)
