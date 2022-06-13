@@ -3,11 +3,15 @@ channels:
   - conda-forge
 dependencies:
   - python=3.8
-  - tensorflow-deps
-  - pandas
   - jupyter
+  - tensorflow-deps
   - gdal
   - rasterio
-  - matplotlib
+  - pandas
+  - geopandas  
   - scipy
+  - scikit-image
+  - matplotlib
+  - pydot
+  
 prefix: /Users/clementgorin/miniforge3/envs/arthisto1960

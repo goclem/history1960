@@ -50,9 +50,11 @@ images = images[keep]
 labels = labels[keep]
 del keep
 
+'''
 # Checks data
-# for i in random.choice(range(len(images)), 5):
-#     compare([images[i], labels[i]], ['Image', 'Label'])
+for i in random.choice(range(len(images)), 5):
+    compare([images[i], labels[i]], ['Image', 'Label'])
+'''
 
 #%%  SPLITS SAMPLES
 
@@ -91,11 +93,13 @@ del image_augmentation, label_augmentation, data_generator, images_generator, la
 # Rescales validation data
 images_valid = layers.Rescaling(1./255)(images_valid)
 
+'''
 # Checks data
-# images, labels = next(train_generator)
-# for i in random.choice(range(len(images)), 5):
-#     compare(images=[images[i], labels[i]], titles=['Image', 'Label'])
-# del images, labels
+images, labels = next(train_generator)
+for i in random.choice(range(len(images)), 5):
+    compare(images=[images[i], labels[i]], titles=['Image', 'Label'])
+del images, labels
+'''
 
 #%% ESTIMATES PARAMETERS
 
@@ -122,14 +126,16 @@ training = model.fit(
 )
 del train_callbacks
 
+'''
 # Saves model and training history
-# models.save_model(model, path.join(paths['models'], 'unet64_baseline.h5'))
-# np.save(path.join(paths['models'], 'unet64_history.npy'), training.history)
+models.save_model(model, path.join(paths['models'], 'unet64_baseline.h5'))
+np.save(path.join(paths['models'], 'unet64_history.npy'), training.history)
 
 # Displays history
-# history = np.load(path.join(paths['models'], 'unet64_history.npy'), allow_pickle=True).item()
-# display_history(history)
-# del history
+history = np.load(path.join(paths['models'], 'unet64_history.npy'), allow_pickle=True).item()
+display_history(history)
+del history
+'''
 
 #%% EVALUATES MODEL
 

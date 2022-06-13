@@ -12,7 +12,7 @@
 import numpy as np
 
 from arthisto1960_utilities import *
-from skimage import morphology, segmentation
+from skimage import segmentation
 from os import path
 
 # Samples
@@ -38,11 +38,10 @@ args = dict(
     reffile = '../data_project/ca.tif'
 )
 
+'''
 # Extracts extent
-# reference = rasterio.open(args['reffile'])
-# reference.bounds
-# reference.nodatavals
-# del reference
+rasterio.open(args['reffile']).bounds
+'''
 
 os.system('gdalbuildvrt -overwrite {vrtfile} {pattern}'.format(**args))
 os.system('gdalwarp -overwrite {vrtfile} {outfile} -t_srs EPSG:3035 -te 3210400 2166600 4191800 3134800 -tr 200 200 -r average -ot Float32'.format(**args))

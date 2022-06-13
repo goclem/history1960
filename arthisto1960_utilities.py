@@ -20,7 +20,7 @@ from matplotlib import pyplot
 from numpy import random
 from rasterio import features
 
-#%% PATHS
+#%% PATHS UTILITIES
 
 paths = dict(
     data='../data_1960',

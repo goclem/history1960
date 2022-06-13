@@ -18,8 +18,7 @@ from pandas import DataFrame
 from skimage import segmentation
 
 # Samples
-cities   = dict(paris='0625_6870|0650_6870', marseille='0875_6245|0875_6270', lyon='0825_6520|0825_6545', toulouse='0550_6295|0575_6295')
-training = identifiers(search_data(paths['labels']), regex = True)
+training = identifiers(search_data(paths['labels']), regex=True)
 
 #%% FUNCTIONS
 
