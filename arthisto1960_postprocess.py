@@ -22,10 +22,9 @@ cities   = '(0625_6870|0650_6870|0875_6245|0875_6270|0825_6520|0825_6545|0550_62
 #%% COMPUTES LABELS
 
 files = search_data(paths['predictions'], pattern='proba.*tif$')
-files = filter_identifiers(files, search_data(paths['predictions'], pattern='label.*tif$'))
 
 for i, file in enumerate(files):
-    print('{file} {index:3d}/{total:3d}'.format(file=path.basename(file), index=i + 1, total=len(files)))
+    print('{file} {index:4d}/{total:4d}'.format(file=path.basename(file), index=i + 1, total=len(files)))
     os.system('gdal_calc.py --overwrite -A {proba} --outfile={label} --calc="A>=0.5" --type=Byte --quiet'.format(proba=file, label=file.replace('proba', 'label')))
 del files, i, file
 
@@ -72,8 +71,8 @@ os.system('ogrmerge.py -single -overwrite_ds -f GPKG -o {outfile} {pattern}'.for
 os.system('find {directory} -name "*.gpkg" -type f -delete'.format(directory=paths['predictions']))
 del args
 
-#%% Display results
-pattern = '({ids}).tif$'.format(ids='|'.join(cities.values()))
-[os.system('open {}'.format(file)) for file in search_data(paths['images'], pattern=f'image_{training}')]
-[os.system('open {}'.format(file)) for file in search_data(paths['predictions'], pattern=f'label_{training}')]
+#%% DISPLAYS RESULTS
+
+files = search_data(paths['images'], pattern=f'image_{training}') + search_data(paths['predictions'], pattern=f'image_{cities}')
+[os.system('open {}'.format(file)) for file in files]
 
