@@ -13,9 +13,11 @@ import numpy as np
 
 from arthisto1960_utilities import *
 from keras import layers, models
+from matplotlib import pyplot
 from os import path
 from pandas import DataFrame
 from skimage import segmentation
+from sklearn import metrics
 
 # Samples
 training = identifiers(search_data(paths['labels']), regex=True)
@@ -64,6 +66,22 @@ def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) 
     pyplot.tight_layout(pad=2.0)
     pyplot.show()
 
+def display_precision_recall(precision:np.ndarray, recall:np.ndarray, fscore:np.ndarray, path:str=None):
+    '''Displays precision - recall curve'''
+    index = np.argmax(fscore)
+    fig, ax = pyplot.subplots(1, figsize=(5, 5))
+    ax.plot(precision, recall, color='blue')
+    ax.scatter(precision[index], recall[index], color='black')
+    ax.set_xlim([-0.01, 1.01])
+    ax.set_ylim([-0.01, 1.01])
+    ax.set_title('Preciaion - Recall curve')
+    ax.set_ylabel('Precision')
+    ax.set_xlabel('Recall')
+    pyplot.tight_layout(pad=2.0)
+    pyplot.show()
+    if path is not None:
+        pyplot.savefig(path, dpi=300)
+
 #%% FORMATS DATA
 
 # Loads model and test data
@@ -76,16 +94,14 @@ probas_pred = layers.Rescaling(1./255)(images_test)
 probas_pred = model.predict(probas_pred, verbose=1)
 labels_pred = probas_pred >= 0.5
 
-# Subsets data
-subset = np.logical_and(
-    np.sum(labels_test, axis=(1, 2, 3)) > 0,
-    np.sum(labels_pred, axis=(1, 2, 3)) > 0
-)
-images_test = images_test[subset]
-labels_test = labels_test[subset]
-probas_pred = probas_pred[subset]
-labels_pred = labels_pred[subset]
-del subset
+# Optimal threshold
+precision, recall, threshold = metrics.precision_recall_curve(labels_test.flatten(), probas_pred.flatten())
+fscore = (2 * precision * recall) / (precision + recall)
+display_precision_recall(precision, recall, fscore)
+
+# ROC curve
+fp_rate, tp_rate, threshold = metrics.roc_curve(labels_test.flatten(), probas_pred.flatten())
+roc_auc = metrics.auc(fp_rate, tp_rate)
 
 #%% COMPUTES PREDICTION STATISTICS
 
@@ -114,4 +130,15 @@ for image, set in zip(images_test[subset], sets[subset]):
     display_statistics(image, set)
 del subset
 
-# %%
+# %% DEPRECIATED
+
+# # Subsets data
+# subset = np.logical_and(
+#     np.sum(labels_test, axis=(1, 2, 3)) > 0,
+#     np.sum(labels_pred, axis=(1, 2, 3)) > 0
+# )
+# images_test = images_test[subset]
+# labels_test = labels_test[subset]
+# probas_pred = probas_pred[subset]
+# labels_pred = labels_pred[subset]
+# del subset

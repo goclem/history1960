@@ -2,8 +2,7 @@
 
 Clément Gorin, gorinclem@gmail.com
 
-**Description:** Extracting buildings depicted in historical maps provides novel insights for urban and spatial economics. Convolutional networks provide state-of-the art performance in various image processing tasks including semantic segmentation. I implement a fully convolutional network to extract features automatically from a collection of 20th century maps covering mainland France. This approach is efficient, scalable and readily applicable to other historical maps with minimal manual labelling.
-
+Extracting buildings depicted in historical maps provides novel insights for urban and spatial economics. Convolutional networks provide state-of-the art performance in various image processing tasks including semantic segmentation. A U-Net architecture is implemented to extract features automatically from a collection of 20th century maps covering mainland France. The model achieves more than 95% precision and recall on a test sample. This approach is efficient, scalable and readily applicable to various collections of historical maps with minimal manual labelling.
 
 ## Structure
 
@@ -22,7 +21,7 @@ Clément Gorin, gorinclem@gmail.com
 
 ## Data
 
-The SCAN50 collection contains 1023 geocoded raster tiles representing mainland France in at the end of the 1950’s. Each tile represents an area of 25 km2 with a 5x5 m resolution. This collection is a patchwork of five different map types, with a varying number of representations and colours. The images can be downloaded form the website of the French National Geographical Institute (IGN). 
+The *SCAN50 historique* collection of maps covers mainland France and Corse at the end of the 1950’s. The database consists of 1023 raster tiles covering an area of 25 km2 with a 5 x 5 m resolution. This collection is a patchwork of five different map types, with a varying number of representations and colours. The rasters can be downloaded form the [website](https://geoservices.ign.fr/scanhisto) of the French National Geographical Institute (IGN). 
 
 Key | Value
 --- | ---
@@ -42,8 +41,18 @@ The label data was created by manually vectorising 17 tiles. We thank Olena Bogd
 
 ## Model
 
+Model 
+
+
+**Structure**: The U-Net architecture for semantic segmentation is fully convolutional. The parameters are updated by gradient descent. Contraction path, expansion path
+
+Every convolutional block contains two convolution, activation and batch-normalisation layers. Spatial dropout is implemented for further regularisation.
 
 <img src='figures/fig_unet.pdf'>
+
+**Optimisation**: The model parameters are updated iteratively using a variant of the gradient descent algorithm (i.e. Adam), which minimises a logistic loss function (i.e. inverse log-likelihood of the binomial distribution) that accounts for the class imbalance in the data. To prevent overfitting, a validation sample is used to assess the generalisation performance after each optimisation iteration. Each iteration uses a batch of 32 images to avoid local minima and saddle-points.
+
+
 
 ## Results
 
