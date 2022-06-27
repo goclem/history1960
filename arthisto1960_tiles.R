@@ -1,8 +1,9 @@
-pacman::p_load(sf, dplyr)
+pacman::p_load(sf, units, dplyr)
 setwd("~/Dropbox/research/arthisto/arthisto1960")
 
 legends <- st_read("../data_1960/tiles/legends_1960.gpkg", quiet = T)
 france  <- st_read("~/Dropbox/data/coutries/countries.gpkg", quiet = T) 
+train   <- st_read("../data_1960/tiles/training_1960.gpkg", quiet = T)
 
 # France geometries -------------------------------------------------------
 
@@ -19,6 +20,11 @@ rm(keep)
 
 legends <- st_intersection(legends, france)
 
+# Training area
+train <- filter(legends, tile %in% train$tile)
+sum(st_area(train)) / sum(st_area(legends)) * 100
+
+# Legend vectors
 types <- legends %>% 
   group_by(legend) %>% 
   summarise() %>%
@@ -29,6 +35,7 @@ types <- legends %>%
 
 st_write(types, "../data_1960/tiles/types_1960.gpkg", delete_dsn = T, quiet = T)
 
+# Years vectors
 years <- legends %>% 
   group_by(year) %>% 
   summarise() %>% 

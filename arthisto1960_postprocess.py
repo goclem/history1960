@@ -50,6 +50,13 @@ os.remove(args['vrtfile'])
 os.system('gdal_calc.py --overwrite -A {outfile} -B {reffile} --outfile={outfile} --calc="(A*(B!=0))-(B==0)" --NoDataValue=-1 --type=Float32 --quiet'.format(**args))
 del args
 
+# Fix 8 missing values in buildings1960 that shouldn't be (edges)
+density = read_raster(args['outfile'])
+ref     = read_raster(args['reffile'], dtype='uint8')
+density = np.where(np.logical_and(density == -1, ref != 0), 0, density)
+write_raster(density, args['outfile'], args['outfile'], nodata=-1, dtype='float32')
+del density, ref
+
 #%% COMPUTES VECTORS    
 
 # Vectorises individual tiles

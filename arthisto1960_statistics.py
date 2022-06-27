@@ -10,6 +10,7 @@
 
 # Modules
 import numpy as np
+import pickle
 
 from arthisto1960_utilities import *
 from keras import layers, models
@@ -71,16 +72,52 @@ def display_precision_recall(precision:np.ndarray, recall:np.ndarray, fscore:np.
     index = np.argmax(fscore)
     fig, ax = pyplot.subplots(1, figsize=(5, 5))
     ax.plot(precision, recall, color='blue')
-    ax.scatter(precision[index], recall[index], color='black')
+    ax.scatter(precision[index], recall[index], color='black', zorder=2)
     ax.set_xlim([-0.01, 1.01])
     ax.set_ylim([-0.01, 1.01])
-    ax.set_title('Preciaion - Recall curve')
-    ax.set_ylabel('Precision')
-    ax.set_xlabel('Recall')
+    ax.set_title('Precision - Recall curve')
+    ax.set_xlabel('Precision')
+    ax.set_ylabel('Recall')
     pyplot.tight_layout(pad=2.0)
-    pyplot.show()
     if path is not None:
         pyplot.savefig(path, dpi=300)
+    else:
+        pyplot.show()
+
+def display_fscore(fscore:np.ndarray, threshold:np.ndarray, path:str=None):
+    '''Displays fscore - threshold curve'''
+    fscore  = fscore[:-1] # Same length as threshold
+    index   = np.argmax(fscore)
+    fig, ax = pyplot.subplots(1, figsize=(5, 5))
+    ax.plot(threshold, fscore, color='red')
+    ax.scatter(threshold[index], fscore[index], color='black', zorder=2)
+    ax.set_xlim([-0.01, 1.01])
+    ax.set_ylim([-0.01, 1.01])
+    ax.set_title('Threshold - Fscore curve')
+    ax.set_xlabel('Threshold')
+    ax.set_ylabel('Fscore')
+    pyplot.tight_layout(pad=2.0)
+    if path is not None:
+        pyplot.savefig(path, dpi=300)
+    else:
+        pyplot.show()
+
+def display_roc(fp_rate:np.ndarray, tp_rate:np.ndarray, path:str=None):
+    '''Displays ROC curve'''
+    fig, ax = pyplot.subplots(1, figsize=(5, 5))
+    ax.plot(fp_rate, tp_rate, color='blue', label='AUC: %0.4f' % roc_auc)
+    ax.plot([0, 1], [0, 1], color='red', linestyle='dashed')
+    ax.set_xlim([-0.01, 1.01])
+    ax.set_ylim([-0.01, 1.01])
+    ax.set_title('Receiver operating characteristic')
+    ax.set_xlabel('False positive rate')
+    ax.set_ylabel('True positive rate')
+    ax.legend(loc='lower right', frameon=False)
+    pyplot.tight_layout(pad=2.0)
+    if path is not None:
+        pyplot.savefig(path, dpi=300)
+    else:
+        pyplot.show()
 
 #%% FORMATS DATA
 
@@ -94,14 +131,20 @@ probas_pred = layers.Rescaling(1./255)(images_test)
 probas_pred = model.predict(probas_pred, verbose=1)
 labels_pred = probas_pred >= 0.5
 
-# Optimal threshold
-precision, recall, threshold = metrics.precision_recall_curve(labels_test.flatten(), probas_pred.flatten())
-fscore = (2 * precision * recall) / (precision + recall)
-display_precision_recall(precision, recall, fscore)
+#%% COMPUTES ROC & AUC STATISTICS
 
-# ROC curve
 fp_rate, tp_rate, threshold = metrics.roc_curve(labels_test.flatten(), probas_pred.flatten())
 roc_auc = metrics.auc(fp_rate, tp_rate)
+
+display_roc(fp_rate, tp_rate, path.join(paths['statistics'], 'fig_roc.pdf'))
+
+#%% COMPUTES PRECISION & RECALL STATISTICS
+
+precision, recall, threshold = metrics.precision_recall_curve(labels_test.flatten(), probas_pred.flatten())
+fscore = (2 * precision * recall) / (precision + recall)
+
+display_precision_recall(precision, recall, fscore, path.join(paths['statistics'], 'fig_precision_recall.pdf'))
+display_fscore(fscore, threshold, path.join(paths['statistics'], 'fig_fscore.pdf'))
 
 #%% COMPUTES PREDICTION STATISTICS
 
