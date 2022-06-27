@@ -47,10 +47,11 @@ def compute_statistics(sets:np.ndarray):
     '''Computes prediction statistics'''
     tp, tn, fp, fn = np.sum(sets, axis=(1, 2, 3))
     with np.errstate(divide='ignore', invalid='ignore'): # Returns Inf when dividing by 0
-        recall    = np.divide(tp, (tp + fn)) # Among the building pixels, {recall}% are classified as building
-        precision = np.divide(tp, (tp + fp)) # Among the pixels classified as buildings, {precision}% are in fact buildings
         accuracy  = np.divide((tp + tn), (tp + tn + fp + fn))
-    statistics = dict(tp=tp, tn=tn, fp=fp, fn=fn, recall=recall, precision=precision, accuracy=accuracy)
+        precision = np.divide(tp, (tp + fp)) # Among the pixels classified as buildings, {precision}% are in fact buildings
+        recall    = np.divide(tp, (tp + fn)) # Among the building pixels, {recall}% are classified as building
+        fscore    = (2 * precision * recall) / (precision + recall)
+    statistics = dict(tp=tp, tn=tn, fp=fp, fn=fn, accuracy=accuracy, precision=precision, recall=recall, fscore=fscore)
     return statistics
 
 def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) -> None:
@@ -70,9 +71,11 @@ def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) 
 def display_precision_recall(precision:np.ndarray, recall:np.ndarray, fscore:np.ndarray, path:str=None):
     '''Displays precision - recall curve'''
     index = np.argmax(fscore)
+    auc   = metrics.auc(recall, precision)
     fig, ax = pyplot.subplots(1, figsize=(5, 5))
-    ax.plot(precision, recall, color='blue')
+    ax.plot(precision, recall, color='blue', label='AUC: %0.4f' % auc)
     ax.scatter(precision[index], recall[index], color='black', zorder=2)
+    ax.legend(loc='lower left', frameon=False)
     ax.set_xlim([-0.01, 1.01])
     ax.set_ylim([-0.01, 1.01])
     ax.set_title('Precision - Recall curve')
@@ -89,7 +92,7 @@ def display_fscore(fscore:np.ndarray, threshold:np.ndarray, path:str=None):
     fscore  = fscore[:-1] # Same length as threshold
     index   = np.argmax(fscore)
     fig, ax = pyplot.subplots(1, figsize=(5, 5))
-    ax.plot(threshold, fscore, color='red')
+    ax.plot(threshold, fscore, color='blue')
     ax.scatter(threshold[index], fscore[index], color='black', zorder=2)
     ax.set_xlim([-0.01, 1.01])
     ax.set_ylim([-0.01, 1.01])
@@ -104,15 +107,16 @@ def display_fscore(fscore:np.ndarray, threshold:np.ndarray, path:str=None):
 
 def display_roc(fp_rate:np.ndarray, tp_rate:np.ndarray, path:str=None):
     '''Displays ROC curve'''
+    auc     = metrics.auc(fp_rate, tp_rate)
     fig, ax = pyplot.subplots(1, figsize=(5, 5))
-    ax.plot(fp_rate, tp_rate, color='blue', label='AUC: %0.4f' % roc_auc)
+    ax.plot(fp_rate, tp_rate, color='blue', label='AUC: %0.4f' % auc)
     ax.plot([0, 1], [0, 1], color='red', linestyle='dashed')
+    ax.legend(loc='lower right', frameon=False)
     ax.set_xlim([-0.01, 1.01])
     ax.set_ylim([-0.01, 1.01])
     ax.set_title('Receiver operating characteristic')
     ax.set_xlabel('False positive rate')
     ax.set_ylabel('True positive rate')
-    ax.legend(loc='lower right', frameon=False)
     pyplot.tight_layout(pad=2.0)
     if path is not None:
         pyplot.savefig(path, dpi=300)
@@ -134,8 +138,6 @@ labels_pred = probas_pred >= 0.5
 #%% COMPUTES ROC & AUC STATISTICS
 
 fp_rate, tp_rate, threshold = metrics.roc_curve(labels_test.flatten(), probas_pred.flatten())
-roc_auc = metrics.auc(fp_rate, tp_rate)
-
 display_roc(fp_rate, tp_rate, path.join(paths['statistics'], 'fig_roc.pdf'))
 
 #%% COMPUTES PRECISION & RECALL STATISTICS
@@ -150,7 +152,7 @@ display_fscore(fscore, threshold, path.join(paths['statistics'], 'fig_fscore.pdf
 
 # Compute sets and removes border
 sets = np.array(list(map(compute_sets, labels_test, labels_pred)))
-sets = np.array(list(map(mask_borders, sets, labels_test)))
+sets = np.array(list(map(mask_borders, sets, labels_test))) # Run to remove borders
 
 # Aggregated statistics
 stats = np.sum(sets, axis=0)
