@@ -17,7 +17,7 @@ from os import path
 
 # Samples
 training = identifiers(search_data(paths['labels']), regex = True)
-cities   = '(0625_6870|0650_6870|0875_6245|0875_6270|0825_6520|0825_6545|0550_6295|0575_6295).tif$'
+cities   = '(0400_6420|0625_6870|0650_6870|0875_6245|0875_6270|0825_6520|0825_6545|0550_6295|0575_6295).tif$'
 
 #%% COMPUTES LABELS
 
@@ -61,6 +61,7 @@ del density, ref
 
 # Vectorises individual tiles
 files = search_data(paths['predictions'], pattern=f'label_{training}') + search_data(paths['predictions'], pattern=f'label_{cities}')
+files.sort()
 
 for i, file in enumerate(files):
     print('{file} {index:2d}/{total:2d}'.format(file=path.basename(file), index=i + 1, total=len(files)))
