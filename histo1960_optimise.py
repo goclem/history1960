@@ -13,8 +13,8 @@ import itertools
 import numpy as np
 import tensorflow
 
-from arthisto1960_model import binary_unet
-from arthisto1960_utilities import *
+from histo1960_model import binary_unet
+from histo1960_utilities import *
 from keras import callbacks, layers, models, preprocessing
 from numpy import random
 from os import path

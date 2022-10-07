@@ -28,7 +28,8 @@ paths = dict(
     labels='../data_1960/labels',
     models='../data_1960/models',
     predictions='../data_1960/predictions',
-    statistics='../data_1960/statistics'
+    statistics='../data_1960/statistics',
+    figures='../data_1960/figures'
 )
 
 #%% FILES UTILITIES
@@ -139,9 +140,11 @@ def blocks_to_images(blocks:np.ndarray, imagesize:tuple, shift:bool=False) ->  n
     images = images[:, padwidth:imagewidth + padwidth, padheight:imageheight + padheight, :]
     return images
 
-def not_empty(image, value:int=255):
+def not_empty(image, type:str='all', value:int=255):
     '''Checks for empty images'''
-    test = np.equal(image, np.full(image.shape, value)).all()
+    test = np.equal(image, np.full(image.shape, value))
+    if type == 'all': test = np.all(test)
+    if type == 'any': test = np.any(test)
     test = np.invert(test)
     return test
 
@@ -155,16 +158,19 @@ def sample_split(images:np.ndarray, sizes:dict, seed:int=1) -> list:
 
 #%% DISPLAY UTILITIES
     
-def display(image:np.ndarray, title:str='', cmap:str='gray') -> None:
+def display(image:np.ndarray, title:str='', cmap:str='gray', path:str=None) -> None:
     '''Displays an image'''
     fig, ax = pyplot.subplots(1, figsize=(10, 10))
     ax.imshow(image, cmap=cmap)
     ax.set_title(title, fontsize=20)
     ax.set_axis_off()
     pyplot.tight_layout()
-    pyplot.show()
+    if path is not None:
+        pyplot.savefig(path, dpi=300)
+    else:
+        pyplot.show()
 
-def compare(images:list, titles:list=['Image'], cmaps:list=['gray']) -> None:
+def compare(images:list, titles:list=['Image'], cmaps:list=['gray'], path:str=None) -> None:
     '''Displays multiple images'''
     nimage = len(images)
     if len(titles) == 1:
@@ -177,7 +183,10 @@ def compare(images:list, titles:list=['Image'], cmaps:list=['gray']) -> None:
         ax.set_title(title, fontsize=15)
         ax.set_axis_off()
     pyplot.tight_layout()
-    pyplot.show()
+    if path is not None:
+        pyplot.savefig(path, dpi=300)
+    else:
+        pyplot.show()
 
 def display_history(history:dict, stats:list=['accuracy', 'loss']) -> None:
     '''Displays training history'''

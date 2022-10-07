@@ -9,7 +9,7 @@
 #%% MODULES
 import geopandas
 
-from arthisto1960_utilities import *
+from histo1960_utilities import *
 from os import path
 
 paths = dict(

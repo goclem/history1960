@@ -12,7 +12,7 @@
 import numpy as np
 import pickle
 
-from arthisto1960_utilities import *
+from histo1960_utilities import *
 from keras import layers, models
 from matplotlib import pyplot
 from os import path

@@ -11,7 +11,7 @@
 # Modules
 import numpy as np
 
-from arthisto1960_utilities import *
+from histo1960_utilities import *
 from skimage import segmentation
 from os import path
 
