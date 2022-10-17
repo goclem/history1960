@@ -54,7 +54,7 @@ def compute_statistics(sets:np.ndarray):
     statistics = dict(tp=tp, tn=tn, fp=fp, fn=fn, accuracy=accuracy, precision=precision, recall=recall, fscore=fscore)
     return statistics
 
-def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) -> None:
+def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0), path:str=None) -> None:
     '''Displays prediction masks'''
     counts = np.sum(sets, axis=(1, 2, 3))
     titles = ['True positive ({:d})', 'True negative ({:d})', 'False positive ({:d})', 'False negative ({:d})']
@@ -66,7 +66,10 @@ def display_statistics(image:np.ndarray, sets:np.ndarray, colour=(255, 255, 0)) 
         ax.set_title(title, fontsize=20)
         ax.axis('off')
     pyplot.tight_layout(pad=2.0)
-    pyplot.show()
+    if path is not None:
+        pyplot.savefig(path, dpi=300)
+    else:
+        pyplot.show()
 
 def display_precision_recall(precision:np.ndarray, recall:np.ndarray, fscore:np.ndarray, path:str=None):
     '''Displays precision - recall curve'''
@@ -170,20 +173,9 @@ stats.hist(['precision', 'recall'], bins=100, ax=fig.gca())
 del fig
 
 # Displays image statistics
-subset = stats.sort_values(by='fn', ascending=False).index[:10]
+subset = stats.sort_values(by='fn', ascending=False).index[:5]
 for image, set in zip(images_test[subset], sets[subset]):
     display_statistics(image, set)
 del subset
 
-# %% DEPRECIATED
-
-# # Subsets data
-# subset = np.logical_and(
-#     np.sum(labels_test, axis=(1, 2, 3)) > 0,
-#     np.sum(labels_pred, axis=(1, 2, 3)) > 0
-# )
-# images_test = images_test[subset]
-# labels_test = labels_test[subset]
-# probas_pred = probas_pred[subset]
-# labels_pred = labels_pred[subset]
-# del subset
+#%% ESTIMATE VARIANCE USING MONTE-CARLO DROPOUT
