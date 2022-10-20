@@ -16,6 +16,7 @@ import tensorflow
 from histo1960_utilities import *
 from keras import layers, models
 from matplotlib import offsetbox, patheffects
+from numpy import linalg
 from os import path
 from skimage import color, exposure, transform
 from sklearn import cluster, decomposition, manifold
@@ -158,19 +159,26 @@ display_grid(images, (5, 5), figsize=(20, 20.5), path=path.join(paths['figures']
 
 #%% REPRESENTATIONS
 
-# Loads model
-model = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
-
 # Loads data
 images = np.load(path.join(paths['statistics'], 'images_test.npy'))
 keep   = list(map(not_empty, images, itertools.repeat('any')))
 images = images[keep] / 255
 
+# Loads model
+model = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
+
 # Extracts representations
 extractor = model.get_layer(name=f'bottleneck_activation1')
 extractor = models.Model(inputs=model.inputs, outputs=extractor.output)
 represent = extractor.predict(images)
+
+# Averages representations
 represent = np.mean(represent, axis=(1,2))
+
+# Maintains some spatial dimension
+# represent = extractor.predict(images)
+# represent = layers.AveragePooling2D((8, 8))(represent)
+# represent = represent.numpy().reshape(916, 2*2*1024)
 
 # TSNE (clusters)
 tsne = manifold.TSNE(perplexity=50, n_components=2, init='pca', n_iter=5000, learning_rate='auto', random_state=1)
@@ -203,7 +211,7 @@ pyplot.show()
 
 # Scatter plot with images
 # np.unique(meanshift.labels_)
-for i, group in enumerate([0, 5]):
+for i, group in enumerate([0, 4, 7]):
     print(f'Processing group {group}')
     subset = groups == group
     fig, ax = pyplot.subplots(figsize=(10, 10)) 
@@ -222,8 +230,6 @@ for i, group in enumerate([0, 5]):
 
 #%% ASSOCIATIONS
 
-from numpy import argmax, linalg
-
 def cosine_similarity(x1, x2):
     '''Computes cosine similarity between two vectors'''
     x1, x2 = (np.squeeze(x1), np.squeeze(x2))
@@ -232,12 +238,12 @@ def cosine_similarity(x1, x2):
 
 # Image of a legend - legend vector + another legend vector ?
 
-display_grid(images[groups == 5][:25], (5, 5))
+display_grid(images[groups == 0][:25], (5, 5))
 
-image            = images[groups == 5][0]
-image_represent  = represent[groups == 5][0]
+image            = images[groups == 0][13]
+image_represent  = represent[groups == 5][13]
 group1_represent = np.mean(represent[groups == 5], axis=0)
-group2_represent = np.mean(represent[groups == 3], axis=0)
+group2_represent = np.mean(represent[groups == 4], axis=0)
 
 operation = image_represent - group1_represent + group2_represent
 distance  = np.apply_along_axis(lambda x: cosine_similarity(operation, x), 1, represent)
@@ -246,7 +252,7 @@ matches   = images[indexes]
 match = transform.rotate(matches[0], 90)
 
 compare(matches)
-compare([image, matches[5]])
+compare([image, matches[0]])
 
 display(image, path=path.join(paths['figures'], f'fig_association0.jpg'))
 display(match, path=path.join(paths['figures'], f'fig_association1.jpg'))
