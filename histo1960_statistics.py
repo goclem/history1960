@@ -19,6 +19,7 @@ from os import path
 from pandas import DataFrame
 from skimage import segmentation
 from sklearn import metrics
+from tensorflow import random
 
 # Samples
 training = identifiers(search_data(paths['labels']), regex=True)
@@ -126,24 +127,28 @@ def display_roc(fp_rate:np.ndarray, tp_rate:np.ndarray, path:str=None):
     else:
         pyplot.show()
 
-#%% FORMATS DATA
+#%% LOADS DATA
 
-# Loads model and test data
+# Loads test data
 labels_test = np.load(path.join(paths['statistics'], 'labels_test.npy'))
 images_test = np.load(path.join(paths['statistics'], 'images_test.npy'))
-model       = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
+
+#%% PREDICTS RESPONSE
+
+# Loads model
+model = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
 
 # Predicts test data
-probas_pred = layers.Rescaling(1./255)(images_test)
+probas_pred = images_test / 255
 probas_pred = model.predict(probas_pred, verbose=1)
 labels_pred = probas_pred >= 0.5
 
-#%% COMPUTES ROC & AUC STATISTICS
+#%% ROC & AUC STATISTICS
 
 fp_rate, tp_rate, threshold = metrics.roc_curve(labels_test.flatten(), probas_pred.flatten())
 display_roc(fp_rate, tp_rate, path.join(paths['statistics'], 'fig_roc.pdf'))
 
-#%% COMPUTES PRECISION & RECALL STATISTICS
+#%% PRECISION & RECALL STATISTICS
 
 precision, recall, threshold = metrics.precision_recall_curve(labels_test.flatten(), probas_pred.flatten())
 fscore = (2 * precision * recall) / (precision + recall)
@@ -151,7 +156,7 @@ fscore = (2 * precision * recall) / (precision + recall)
 display_precision_recall(precision, recall, fscore, path.join(paths['statistics'], 'fig_precision_recall.pdf'))
 display_fscore(fscore, threshold, path.join(paths['statistics'], 'fig_fscore.pdf'))
 
-#%% COMPUTES PREDICTION STATISTICS
+#%% PREDICTION STATISTICS
 
 # Compute sets and removes border
 sets = np.array(list(map(compute_sets, labels_test, labels_pred)))
@@ -165,8 +170,6 @@ stats = compute_statistics(stats)
 stats = list(map(compute_statistics, sets))
 stats = DataFrame.from_dict(stats)
 
-#%% DISPLAYS PREDICTION STATISTICS
-
 # Displays statistics distribution
 fig = pyplot.figure(figsize=(10,5))
 stats.hist(['precision', 'recall'], bins=100, ax=fig.gca())
@@ -179,3 +182,30 @@ for image, set in zip(images_test[subset], sets[subset]):
 del subset
 
 #%% ESTIMATE VARIANCE USING MONTE-CARLO DROPOUT
+
+# Loads model
+model = models.load_model(path.join(paths['models'], 'unet64mc_221019.h5'))
+
+# Computes standard deviations
+def predict_std(model, images, niter:int, seed:int=1):
+    # ! Workaround: manual batches (model.predict() doesn't accept training=True and model() doesn't accept batches)
+    # ! Seed: Method does not work without setting tensorflow seed
+    # ? Sensitivity to model dropout rate
+    random.set_seed(seed)
+    nbatches = (len(images) // 63) + 1
+    batches  = np.array_split(images, nbatches, axis=0)
+    batches_std = list()
+    for index, batch in enumerate(batches):
+        print(f'Processing batch {index}/{nbatches-1}')
+        batch_std = np.array([model(batch, training=True) for i in range(niter)])
+        batch_std = np.std(batch_std, axis=0)
+        batches_std.append(batch_std)
+    batches_std = np.concatenate(batches_std)
+    return(batches_std)
+
+probas_std = images_test / 255
+probas_std = predict_std(model, probas_std, niter=10)
+
+
+
+

@@ -15,7 +15,7 @@ import tensorflow
 
 from histo1960_model import binary_unet
 from histo1960_utilities import *
-from keras import callbacks, layers, models, preprocessing
+from keras import callbacks, layers, metrics, models, preprocessing
 from numpy import random
 from os import path
 
@@ -104,13 +104,13 @@ del images, labels
 #%% ESTIMATES PARAMETERS
 
 # Initialises model
-model = binary_unet(input_shape=(256, 256, 3), filters=64)
-model.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['accuracy', 'Recall', 'Precision'])
+model = binary_unet(input_shape=(256, 256, 3), filters=64, dropout=0)
+model.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['BinaryAccuracy', 'Recall', 'Precision'])
 model.summary()
 
 # Callbacks
 train_callbacks = [
-    callbacks.EarlyStopping(monitor='val_accuracy', patience=25, restore_best_weights=True),
+    callbacks.EarlyStopping(monitor='val_accuracy', patience=10, restore_best_weights=True),
     callbacks.ModelCheckpoint(filepath=path.join(paths['models'], 'unet64_{epoch:03d}.h5'), monitor='val_accuracy', save_best_only=True),
     callbacks.BackupAndRestore(backup_dir=paths['models'])
 ]
@@ -120,7 +120,7 @@ training = model.fit(
     train_generator,
     steps_per_epoch=samples_size['train'] // 32,
     validation_data=(images_valid, labels_valid),
-    epochs=1000,
+    epochs=100,
     verbose=1,
     callbacks=train_callbacks
 )
@@ -137,10 +137,44 @@ display_history(history)
 del history
 '''
 
+#%% MONTE_CARLO DROPOUT VERSION
+
+# Initialises model
+model = binary_unet(input_shape=(256, 256, 3), filters=64, dropout=0.2, training=True)
+model.compile(optimizer='adam', loss='binary_focal_crossentropy', metrics=['accuracy', 'Recall', 'Precision'])
+model.summary()
+
+# Initialises parameters
+params = models.load_model(path.join(paths['models'], 'unet64mc_221019.h5'))
+model.set_weights(params.get_weights())
+del params
+
+# Callbacks
+train_callbacks = [
+    callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+    callbacks.ModelCheckpoint(filepath=path.join(paths['models'], 'mc_unet64_{epoch:03d}.h5'), monitor='val_loss', save_best_only=True),
+    callbacks.BackupAndRestore(backup_dir=paths['models'])
+]
+
+# Training
+training = model.fit(
+    train_generator,
+    steps_per_epoch=samples_size['train'] // 32,
+    validation_data=(images_valid, labels_valid),
+    epochs=100,
+    verbose=1,
+    callbacks=train_callbacks
+)
+del train_callbacks
+
+# models.save_model(model, path.join(paths['models'], 'unet64mc_221019.h5'))
+# np.save(path.join(paths['models'], 'unet64mc_history_221019.npy'), training.history)
+
 #%% EVALUATES MODEL
 
 # Loads model
-model = models.load_model(path.join(paths['models'], 'unet64_baseline.h5'))
+# model = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
+model = models.load_model(path.join(paths['models'], 'unet64mc_221019.h5'))
 
 # Compute statistics
 performance = layers.Rescaling(1./255)(images_test)

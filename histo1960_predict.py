@@ -28,7 +28,7 @@ tensorflow.compat.v1.logging.set_verbosity(tensorflow.compat.v1.logging.ERROR)
 
 # FUNCTIONS
 
-def predict_tiles(model, files):
+def predict_tiles(model, files:list) -> np.ndarray:
     '''Predicts image batch'''
     images  = np.array([read_raster(file) for file in files])
     images  = layers.Rescaling(1./255)(images)
@@ -42,7 +42,39 @@ def predict_tiles(model, files):
     gc.collect()
     return probas
 
-#%% PREDICTS NEW TILES
+def montecarlo_std(model, blocks:np.ndarray, niter:int, seed:int) -> np.ndarray:
+    '''Experimental: Computes Monte-Carlo Dropout standard deviation'''
+    # ! Workaround: manual batches (model.predict() doesn't accept training=True and model() doesn't accept batches)
+    # ! Seed: Method does not work without setting tensorflow seed
+    # ? Sensitivity to model dropout rate
+    tensorflow.random.set_seed(seed)
+    nbatches = (len(blocks) // 63) + 1
+    batches  = np.array_split(blocks, nbatches, axis=0)
+    probas_std = list()
+    for index, batch in enumerate(batches):
+        print(f'Processing batch {index}/{nbatches-1}')
+        batch_std = np.array([model(batch, training=True) for i in range(niter)])
+        batch_std = np.std(batch_std, axis=0)
+        probas_std.append(batch_std)
+    probas_std = np.concatenate(probas_std)
+    gc.collect()
+    return probas_std
+
+def predict_montecarlo_std(model, files:list, niter:int, seed:int=1) -> np.ndarray:
+    '''Predicts image batch'''
+    images  = np.array([read_raster(file) for file in files])
+    images  = layers.Rescaling(1./255)(images)
+    blocks1 = images_to_blocks(images, blocksize=(256, 256), shift=False, constant_values=1)
+    blocks2 = images_to_blocks(images, blocksize=(256, 256), shift=True,  constant_values=1)
+    mcstds1 = montecarlo_std(model, blocks1, niter=niter, seed=seed)
+    mcstds2 = montecarlo_std(model, blocks2, niter=niter, seed=seed)
+    mcstds1 = blocks_to_images(mcstds1, imagesize=images.shape[:3] + (1,), shift=False)
+    mcstds2 = blocks_to_images(mcstds2, imagesize=images.shape[:3] + (1,), shift=True)
+    mcstds  = (mcstds1 + mcstds2) / 2
+    gc.collect()
+    return stds
+
+#%% PREDICTS TILES
 
 # Loads model
 model = models.load_model(path.join(paths['models'], 'unet64_220609.h5'))
@@ -62,4 +94,21 @@ for i, files in enumerate(batches):
     for proba, file, outfile in zip(probas, files, outfiles):
         write_raster(array=proba, profile=file, destination=outfile, nodata=None, dtype='float32')
 del i, files, file, probas, proba, outfiles, outfile
-# %%
+
+#%% UNCERTAINTY WITH MONTE CARLO DROPOUT
+
+# Loads model
+model = models.load_model(path.join(paths['models'], 'unet64mc_221019.h5'))
+files = search_data(paths['images'], pattern='(0550_6295|0575_6295)\\.tif')
+stds  = predict_montecarlo_std(model, files, 100)
+
+# Check https://seunghan96.github.io/bnn/code-5.Monte-Carlo-Drop-Out/ for exact caluclation
+
+# def uncertainity_estimate(x, model, num_samples, l2):
+#     y_mean = outputs.mean(axis=1)
+#     y_variance = outputs.var(axis=1)
+#     tau = l2 * (1. - model.do_rate) / (2. * n * model.w_decay)
+#     y_variance += (1. / tau)
+#     y_std = np.sqrt(y_variance)
+
+#     return y_mean, y_std

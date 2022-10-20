@@ -102,9 +102,9 @@ images = images[keep]
 # Pick an image
 random.seed(3)
 random.shuffle(images)
-
-image  = images[[15]]
 display_grid(images, (5, 5), figsize=(20, 20.5))
+image  = images[[8]]
+
 display(np.squeeze(image))
 
 # Extract activations
@@ -123,8 +123,8 @@ for layer_name in ['encoder1', 'encoder2', 'encoder3', 'encoder4', 'bottleneck']
 
 activations = np.array(sum(activations, []))
 
-display_grid(activations, (5, 5), figsize=(20, 20.5))
-display_grid(activations, (5, 5), figsize=(20, 20.5), path=path.join(paths['figures'], f'fig_activations.jpg'), dpi=150)
+display_grid(activations, (5, 5), figsize=(20, 20.5), cmap='inferno')
+display_grid(activations, (5, 5), figsize=(20, 20.5), cmap='inferno', path=path.join(paths['figures'], f'fig_activations.jpg'), dpi=150)
 
 #%% VISUALISE FILTERS
 
